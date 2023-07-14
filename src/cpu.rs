@@ -1692,9 +1692,14 @@ impl Cpu {
     }
 
     fn and(&mut self) -> usize {
-        todo!()
-    }
+        self.fetch();
+        self.a &= self.fetched;
 
+        self.set_flag(Flags::Z, self.a == 0x00);
+        self.set_flag(Flags::N, (self.a & 0b10000000) > 0);
+
+        1
+    }
     fn bit(&mut self) -> usize {
         todo!()
     }
@@ -1748,7 +1753,20 @@ impl Cpu {
     }
 
     fn adc(&mut self) -> usize {
-        todo!()
+        self.fetch();
+
+        let res: u16 = self.a as u16 + self.fetched as u16 + self.get_flag(Flags::C) as u16;
+        let overflow: bool =
+            ((!((self.a as u16) ^ (self.fetched as u16)) & ((self.a as u16) ^ res)) & 0x0080) > 0;
+
+        self.set_flag(Flags::C, res > 255);
+        self.set_flag(Flags::Z, (res & 0x00FF) == 0);
+        self.set_flag(Flags::N, (res & 0x80) > 0);
+        self.set_flag(Flags::V, overflow);
+
+        self.a = (res & 0x00FF) as u8;
+
+        1
     }
 
     fn ror(&mut self) -> usize {
@@ -1913,7 +1931,21 @@ impl Cpu {
     }
 
     fn sbc(&mut self) -> usize {
-        todo!()
+        self.fetch();
+
+        let operand: u16 = (self.fetched as u16) ^ 0x00FF;
+        let res: u16 = self.a as u16 + operand + self.get_flag(Flags::C) as u16;
+        let overflow: bool =
+            ((!((self.a as u16) ^ (self.fetched as u16)) & ((self.a as u16) ^ res)) & 0x0080) > 0;
+
+        self.set_flag(Flags::C, res > 255);
+        self.set_flag(Flags::Z, (res & 0x00FF) == 0);
+        self.set_flag(Flags::N, (res & 0x80) > 0);
+        self.set_flag(Flags::V, overflow);
+
+        self.a = (res & 0x00FF) as u8;
+
+        1
     }
 
     fn inc(&mut self) -> usize {
