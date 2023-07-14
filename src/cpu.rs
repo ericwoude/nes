@@ -25,7 +25,7 @@ pub struct Cpu {
     a: u8,
     x: u8,
     y: u8,
-    sp: u16,
+    sp: u8,
     pc: u16,
     status: u8,
     bus: Bus,
@@ -45,7 +45,7 @@ impl Cpu {
             a: 0x00,
             x: 0x00,
             y: 0x00,
-            sp: 0x0000,
+            sp: 0x00,
             pc: 0x0000,
             status: 0x00,
             bus: Bus::new(),
@@ -1784,7 +1784,12 @@ impl Cpu {
     }
 
     fn txa(&mut self) -> usize {
-        todo!()
+        self.a = self.x;
+
+        self.set_flag(Flags::Z, self.a == 0);
+        self.set_flag(Flags::N, (self.a & 0b10000000) > 0);
+
+        0
     }
 
     fn bcc(&mut self) -> usize {
@@ -1792,31 +1797,66 @@ impl Cpu {
     }
 
     fn tya(&mut self) -> usize {
-        todo!()
+        self.a = self.y;
+
+        self.set_flag(Flags::Z, self.a == 0);
+        self.set_flag(Flags::N, (self.a & 0b10000000) > 0);
+
+        0
     }
 
     fn txs(&mut self) -> usize {
-        todo!()
+        self.sp = self.x;
+
+        0
     }
 
     fn ldy(&mut self) -> usize {
-        todo!()
+        self.fetch();
+        self.y = self.fetched;
+
+        self.set_flag(Flags::Z, self.y == 0);
+        self.set_flag(Flags::N, (self.y & 0b10000000) > 0);
+
+        1
     }
 
     fn lda(&mut self) -> usize {
-        todo!()
+        self.fetch();
+        self.a = self.fetched;
+
+        self.set_flag(Flags::Z, self.a == 0);
+        self.set_flag(Flags::N, (self.a & 0b10000000) > 0);
+
+        1
     }
 
     fn ldx(&mut self) -> usize {
-        todo!()
+        self.fetch();
+        self.x = self.fetched;
+
+        self.set_flag(Flags::Z, self.x == 0);
+        self.set_flag(Flags::N, (self.x & 0b10000000) > 0);
+
+        1
     }
 
     fn tay(&mut self) -> usize {
-        todo!()
+        self.y = self.a;
+
+        self.set_flag(Flags::Z, self.y == 0);
+        self.set_flag(Flags::N, (self.y & 0b10000000) > 0);
+
+        0
     }
 
     fn tax(&mut self) -> usize {
-        todo!()
+        self.x = self.a;
+
+        self.set_flag(Flags::Z, self.x == 0);
+        self.set_flag(Flags::N, (self.x & 0b10000000) > 0);
+
+        0
     }
 
     fn bcs(&mut self) -> usize {
@@ -1828,7 +1868,12 @@ impl Cpu {
     }
 
     fn tsx(&mut self) -> usize {
-        todo!()
+        self.x = self.sp;
+
+        self.set_flag(Flags::Z, self.x == 0);
+        self.set_flag(Flags::N, (self.x & 0b10000000) > 0);
+
+        0
     }
 
     fn cpy(&mut self) -> usize {
