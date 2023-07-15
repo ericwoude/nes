@@ -10,7 +10,7 @@ pub enum Flags {
     B = (1 << 4), // break
     U = (1 << 5), // unused
     V = (1 << 6), // overflow
-    N = (1 << 7), // negeative
+    N = (1 << 7), // negative
 }
 
 #[derive(Clone, Copy)]
@@ -1451,12 +1451,12 @@ impl Cpu {
 
     pub fn clock(&mut self) {
         if self.cycles == 0 {
-            let opcode = self.bus.read(self.pc);
+            self.opcode = self.bus.read(self.pc);
             self.pc += 1;
 
             let instruction = self
                 .dispatch
-                .get(&opcode)
+                .get(&self.opcode)
                 .copied()
                 .expect("Unknown instruction");
             self.cycles = instruction.cycles;
@@ -1470,16 +1470,50 @@ impl Cpu {
         self.cycles -= 1;
     }
 
-    fn reset(&self) {
-        todo!()
+    pub fn reset(&mut self) {
+        self.a = 0x00;
+        self.x = 0x00;
+        self.y = 0x00;
+        self.sp = 0xFD;
+        self.status = Flags::U as u8;
+
+        self.addr_abs = 0xFFFC;
+        let lo: u16 = self.bus.read(self.addr_abs) as u16;
+        let hi: u16 = self.bus.read(self.addr_abs + 1) as u16;
+        self.pc = (hi << 8) | lo;
+
+        self.fetched = 0x00;
+        self.addr_rel = 0x0000;
+        self.addr_abs = 0x0000;
+
+        self.cycles = 8;
     }
 
-    fn irq(&self) {
-        todo!()
+    fn irq(&mut self) {
+        if !self.get_flag(Flags::I) {
+            self.nmi();
+        }
     }
 
-    fn nmi(&self) {
-        todo!()
+    fn nmi(&mut self) {
+        self.bus
+            .write(0x0100 + self.sp as u16, (self.pc >> 8) & 0x00FF);
+        self.sp -= 1;
+        self.bus.write(0x0100 + self.sp as u16, self.pc & 0x00F);
+        self.sp -= 1;
+
+        self.set_flag(Flags::B, false);
+        self.set_flag(Flags::U, true);
+        self.set_flag(Flags::I, true);
+        self.bus.write(0x0100 + self.sp as u16, self.status as u16);
+        self.sp -= 1;
+
+        self.addr_abs = 0xFFFE;
+        let lo: u16 = self.bus.read(self.addr_abs) as u16;
+        let hi: u16 = self.bus.read(self.addr_abs + 1) as u16;
+        self.pc = (hi << 8) | lo;
+
+        self.cycles = 7;
     }
 
     // ADDRESSING FUNCTIONS
@@ -1651,20 +1685,46 @@ impl Cpu {
 
     fn fetch(&mut self) -> u8 {
         let instruction = self.dispatch.get(&self.opcode).expect("Unknown opcode");
-
-        if instruction.addressmode as usize != Cpu::imm as usize {
+        if instruction.addressmode as usize != Cpu::imp as usize {
             self.fetched = self.bus.read(self.addr_abs);
         }
 
         self.fetched
     }
 
-    fn xxx(&mut self) -> usize {
-        todo!()
+    fn conditional_branch(&mut self, flag: Flags, status: bool) {
+        if self.get_flag(flag) == status {
+            self.cycles += 1;
+
+            self.addr_abs = self.pc.overflowing_add(self.addr_rel).0;
+
+            if (self.addr_abs & 0xFF00) != self.pc & 0xFF00 {
+                self.cycles += 1;
+            }
+
+            self.pc = self.addr_abs;
+        }
     }
 
     fn brk(&mut self) -> usize {
-        todo!()
+        self.pc += 1;
+
+        self.set_flag(Flags::I, true);
+
+        self.bus
+            .write(0x0100 + self.sp as u16, (self.pc >> 8) & 0x00FF);
+        self.sp -= 1;
+        self.bus.write(0x0100 + self.sp as u16, self.pc & 0x00FF);
+        self.sp -= 1;
+
+        self.set_flag(Flags::B, true);
+        self.bus.write(0x0100 + self.sp as u16, self.status as u16);
+        self.sp -= 1;
+        self.set_flag(Flags::B, false);
+
+        self.pc = (self.bus.read(0xFFFE) as u16) | ((self.bus.read(0xFFFF) as u16) << 8);
+
+        0
     }
 
     fn ora(&mut self) -> usize {
@@ -1676,24 +1736,27 @@ impl Cpu {
     }
 
     fn php(&mut self) -> usize {
-        let status = self.status;
-
-        self.set_flag(Flag::B, true);
-        self.set_flag(Flag::U, true);
-        self.bus.write(0x0100 + self.sp, self.status);
+        self.bus.write(
+            0x0100 + self.sp as u16,
+            (self.status | Flags::B as u8 | Flags::U as u8) as u16,
+        );
+        self.set_flag(Flags::B, false);
+        self.set_flag(Flags::U, false);
         self.sp -= 1;
-
-        self.status = status;
 
         0
     }
 
     fn bpl(&mut self) -> usize {
-        todo!()
+        self.conditional_branch(Flags::N, false);
+
+        0
     }
 
     fn clc(&mut self) -> usize {
-        todo!()
+        self.set_flag(Flags::C, false);
+
+        0
     }
 
     fn jsr(&mut self) -> usize {
@@ -1719,21 +1782,36 @@ impl Cpu {
 
     fn plp(&mut self) -> usize {
         self.sp += 1;
-        self.status = self.bus.read(0x0100 + self.sp);
+        self.status = self.bus.read(0x0100 + self.sp as u16);
+        self.set_flag(Flags::U, true);
 
         0
     }
 
     fn bmi(&mut self) -> usize {
-        todo!()
+        self.conditional_branch(Flags::N, true);
+
+        0
     }
 
     fn sec(&mut self) -> usize {
-        todo!()
+        self.set_flag(Flags::C, true);
+
+        1
     }
 
     fn rti(&mut self) -> usize {
-        todo!()
+        self.sp += 1;
+        self.status = self.bus.read(0x0100 + self.sp as u16);
+        self.status &= !(Flags::B as u8);
+        self.status &= !(Flags::U as u8);
+
+        self.sp += 1;
+        self.pc = self.bus.read(0x0100 + self.sp as u16) as u16;
+        self.sp += 1;
+        self.pc |= self.bus.read(0x0100 + self.sp as u16).overflowing_shl(8).0 as u16;
+
+        0
     }
 
     fn eor(&mut self) -> usize {
@@ -1745,7 +1823,7 @@ impl Cpu {
     }
 
     fn pha(&mut self) -> usize {
-        self.bus.write(0x0100 + self.sp, self.a);
+        self.bus.write(0x0100 + self.sp as u16, self.a as u16);
         self.sp -= 1;
 
         0
@@ -1756,11 +1834,15 @@ impl Cpu {
     }
 
     fn bvc(&mut self) -> usize {
-        todo!()
+        self.conditional_branch(Flags::V, false);
+
+        0
     }
 
     fn cli(&mut self) -> usize {
-        todo!()
+        self.set_flag(Flags::I, false);
+
+        0
     }
 
     fn rts(&mut self) -> usize {
@@ -1790,36 +1872,51 @@ impl Cpu {
 
     fn pla(&mut self) -> usize {
         self.sp += 1;
-        self.a = self.bus.read(0x0100 + self.sp);
+        self.a = self.bus.read(0x0100 + self.sp as u16);
 
-        self.set_flag(Flags::Z, self.a  == 0);
+        self.set_flag(Flags::Z, self.a == 0);
         self.set_flag(Flags::N, (self.a & 0b10000000) > 0);
 
         0
     }
 
     fn bvs(&mut self) -> usize {
-        todo!()
+        self.conditional_branch(Flags::V, true);
+
+        0
     }
 
     fn sei(&mut self) -> usize {
-        todo!()
+        self.set_flag(Flags::I, true);
+
+        0
     }
 
     fn sta(&mut self) -> usize {
-        todo!()
+        self.bus.write(self.addr_abs, self.a as u16);
+
+        0
     }
 
     fn sty(&mut self) -> usize {
-        todo!()
+        self.bus.write(self.addr_abs, self.y as u16);
+
+        0
     }
 
     fn stx(&mut self) -> usize {
-        todo!()
+        self.bus.write(self.addr_abs, self.x as u16);
+
+        0
     }
 
     fn dey(&mut self) -> usize {
-        todo!()
+        self.y = self.y.overflowing_sub(1).0;
+
+        self.set_flag(Flags::Z, self.y == 0);
+        self.set_flag(Flags::N, (self.y & 0b10000000) > 0);
+
+        0
     }
 
     fn txa(&mut self) -> usize {
@@ -1832,7 +1929,9 @@ impl Cpu {
     }
 
     fn bcc(&mut self) -> usize {
-        todo!()
+        self.conditional_branch(Flags::C, false);
+
+        0
     }
 
     fn tya(&mut self) -> usize {
@@ -1899,11 +1998,15 @@ impl Cpu {
     }
 
     fn bcs(&mut self) -> usize {
-        todo!()
+        self.conditional_branch(Flags::C, true);
+
+        0
     }
 
     fn clv(&mut self) -> usize {
-        todo!()
+        self.set_flag(Flags::V, false);
+
+        0
     }
 
     fn tsx(&mut self) -> usize {
@@ -1932,19 +2035,28 @@ impl Cpu {
     }
 
     fn dex(&mut self) -> usize {
-        todo!()
+        self.x = self.x.overflowing_sub(1).0;
+
+        self.set_flag(Flags::Z, self.x == 0);
+        self.set_flag(Flags::N, (self.x & 0b10000000) > 0);
+
+        0
     }
 
     fn bne(&mut self) -> usize {
-        todo!()
+        self.conditional_branch(Flags::Z, false);
+
+        0
     }
 
     fn cld(&mut self) -> usize {
-        todo!()
+        self.set_flag(Flags::D, false);
+
+        0
     }
 
     fn nop(&mut self) -> usize {
-        todo!()
+        0
     }
 
     fn cpx(&mut self) -> usize {
@@ -1978,10 +2090,14 @@ impl Cpu {
     }
 
     fn beq(&mut self) -> usize {
-        todo!()
+        self.conditional_branch(Flags::Z, true);
+
+        0
     }
 
     fn sed(&mut self) -> usize {
-        todo!()
+        self.set_flag(Flags::D, true);
+
+        0
     }
 }
