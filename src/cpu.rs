@@ -1676,7 +1676,16 @@ impl Cpu {
     }
 
     fn php(&mut self) -> usize {
-        todo!()
+        let status = self.status;
+
+        self.set_flag(Flag::B, true);
+        self.set_flag(Flag::U, true);
+        self.bus.write(0x0100 + self.sp, self.status);
+        self.sp -= 1;
+
+        self.status = status;
+
+        0
     }
 
     fn bpl(&mut self) -> usize {
@@ -1709,7 +1718,10 @@ impl Cpu {
     }
 
     fn plp(&mut self) -> usize {
-        todo!()
+        self.sp += 1;
+        self.status = self.bus.read(0x0100 + self.sp);
+
+        0
     }
 
     fn bmi(&mut self) -> usize {
@@ -1733,7 +1745,10 @@ impl Cpu {
     }
 
     fn pha(&mut self) -> usize {
-        todo!()
+        self.bus.write(0x0100 + self.sp, self.a);
+        self.sp -= 1;
+
+        0
     }
 
     fn jmp(&mut self) -> usize {
@@ -1761,7 +1776,7 @@ impl Cpu {
 
         self.set_flag(Flags::C, res > 255);
         self.set_flag(Flags::Z, (res & 0x00FF) == 0);
-        self.set_flag(Flags::N, (res & 0x80) > 0);
+        self.set_flag(Flags::N, (res & 0b10000000) > 0);
         self.set_flag(Flags::V, overflow);
 
         self.a = (res & 0x00FF) as u8;
@@ -1774,7 +1789,13 @@ impl Cpu {
     }
 
     fn pla(&mut self) -> usize {
-        todo!()
+        self.sp += 1;
+        self.a = self.bus.read(0x0100 + self.sp);
+
+        self.set_flag(Flags::Z, self.a  == 0);
+        self.set_flag(Flags::N, (self.a & 0b10000000) > 0);
+
+        0
     }
 
     fn bvs(&mut self) -> usize {
@@ -1940,7 +1961,7 @@ impl Cpu {
 
         self.set_flag(Flags::C, res > 255);
         self.set_flag(Flags::Z, (res & 0x00FF) == 0);
-        self.set_flag(Flags::N, (res & 0x80) > 0);
+        self.set_flag(Flags::N, (res & 0b10000000) > 0);
         self.set_flag(Flags::V, overflow);
 
         self.a = (res & 0x00FF) as u8;
