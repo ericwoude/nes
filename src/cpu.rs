@@ -2131,7 +2131,12 @@ impl Cpu {
     }
 
     fn iny(&mut self) -> usize {
-        todo!()
+        self.y = self.y.overflowing_add(1).0;
+
+        self.set_flag(Flags::Z, self.y == 0);
+        self.set_flag(Flags::N, (self.y & 0b10000000) > 0);
+
+        0
     }
 
     fn dex(&mut self) -> usize {
@@ -2199,11 +2204,16 @@ impl Cpu {
         self.set_flag(Flags::N, (value & 0b10000000) > 0);
         self.set_flag(Flags::Z, value == 0);
 
-        1
+        0
     }
 
     fn inx(&mut self) -> usize {
-        todo!()
+        self.x = self.x.overflowing_add(1).0;
+
+        self.set_flag(Flags::N, (self.x & 0b10000000) > 0);
+        self.set_flag(Flags::Z, self.x == 0);
+
+        1
     }
 
     fn beq(&mut self) -> usize {
