@@ -1452,23 +1452,30 @@ impl Cpu {
     pub fn clock(&mut self) {
         if self.cycles == 0 {
             self.opcode = self.bus.read(self.pc);
-            self.pc += 1;
+            self.pc = self.pc.overflowing_add(1).0;
+
+            self.set_flag(Flags::U, true);
 
             let instruction = self
                 .dispatch
                 .get(&self.opcode)
                 .copied()
                 .expect("opcode should be in dispatch table");
-
             self.cycles = instruction.cycles;
 
             let addr_cycles = (instruction.addressmode)(self);
             let op_cycles = (instruction.operation)(self);
 
             self.cycles += addr_cycles & op_cycles;
+
+            self.set_flag(Flags::U, true);
         }
 
         self.cycles -= 1;
+    }
+
+    pub fn complete(&self) -> bool {
+        return self.cycles == 0;
     }
 
     pub fn reset(&mut self) {
@@ -1499,15 +1506,15 @@ impl Cpu {
     fn nmi(&mut self) {
         self.bus
             .write(0x0100 + self.sp as u16, (self.pc >> 8) & 0x00FF);
-        self.sp -= 1;
+        self.sp = self.sp.overflowing_sub(1).0;
         self.bus.write(0x0100 + self.sp as u16, self.pc & 0x00F);
-        self.sp -= 1;
+        self.sp = self.sp.overflowing_sub(1).0;
 
         self.set_flag(Flags::B, false);
         self.set_flag(Flags::U, true);
         self.set_flag(Flags::I, true);
         self.bus.write(0x0100 + self.sp as u16, self.status as u16);
-        self.sp -= 1;
+        self.sp = self.sp.overflowing_sub(1).0;
 
         self.addr_abs = 0xFFFE;
         let lo: u16 = self.bus.read(self.addr_abs) as u16;
@@ -1529,7 +1536,7 @@ impl Cpu {
     /// The address is supplied as part of the instruction.
     fn imm(&mut self) -> usize {
         self.addr_abs = self.pc;
-        self.pc += 1;
+        self.pc = self.pc.overflowing_add(1).0;
 
         0
     }
@@ -1538,7 +1545,8 @@ impl Cpu {
     /// a specific page and the low byte to offset into that page
     fn zp0(&mut self) -> usize {
         self.addr_abs = self.bus.read(self.pc) as u16;
-        self.pc += 1;
+        self.pc = self.pc.overflowing_add(1).0;
+
         self.addr_abs &= 0x00FF;
 
         0
@@ -1547,7 +1555,7 @@ impl Cpu {
     /// Zero page addressing with register x as extra offset.
     fn zpx(&mut self) -> usize {
         self.addr_abs = self.bus.read(self.pc) as u16 + self.x as u16;
-        self.pc += 1;
+        self.pc = self.pc.overflowing_add(1).0;
         self.addr_abs &= 0x00FF;
 
         0
@@ -1556,7 +1564,7 @@ impl Cpu {
     /// Zero page addressing with register y as extra offset.
     fn zpy(&mut self) -> usize {
         self.addr_abs = self.bus.read(self.pc) as u16 + self.y as u16;
-        self.pc += 1;
+        self.pc = self.pc.overflowing_add(1).0;
         self.addr_abs &= 0x00FF;
 
         0
@@ -1567,7 +1575,7 @@ impl Cpu {
     /// counter.
     fn rel(&mut self) -> usize {
         self.addr_rel = self.bus.read(self.pc) as u16;
-        self.pc += 1;
+        self.pc = self.pc.overflowing_add(1).0;
 
         if (self.addr_rel & 0b10000000) > 0 {
             self.addr_rel |= 0xFF00;
@@ -1580,9 +1588,9 @@ impl Cpu {
     /// from region in memory at the program counter.
     fn abs(&mut self) -> usize {
         let lo: u16 = self.bus.read(self.pc) as u16;
-        self.pc += 1;
+        self.pc = self.pc.overflowing_add(1).0;
         let hi: u16 = self.bus.read(self.pc) as u16;
-        self.pc += 1;
+        self.pc = self.pc.overflowing_add(1).0;
 
         self.addr_abs = (hi << 8) | lo;
 
@@ -1598,11 +1606,11 @@ impl Cpu {
     /// overflow has occured.
     fn abx(&mut self) -> usize {
         let lo: u16 = self.bus.read(self.pc) as u16;
-        self.pc += 1;
+        self.pc = self.pc.overflowing_add(1).0;
         let hi: u16 = self.bus.read(self.pc) as u16;
-        self.pc += 1;
+        self.pc = self.pc.overflowing_add(1).0;
 
-        self.addr_abs = ((hi << 8) | lo) + self.x as u16;
+        self.addr_abs = ((hi << 8) | lo).overflowing_add(self.x as u16).0;
 
         if (self.addr_abs & 0xFF00) != (hi << 8) {
             1
@@ -1614,11 +1622,11 @@ impl Cpu {
     /// Absolute addressing with y offset.
     fn aby(&mut self) -> usize {
         let lo: u16 = self.bus.read(self.pc) as u16;
-        self.pc += 1;
+        self.pc = self.pc.overflowing_add(1).0;
         let hi: u16 = self.bus.read(self.pc) as u16;
-        self.pc += 1;
+        self.pc = self.pc.overflowing_add(1).0;
 
-        self.addr_abs = ((hi << 8) | lo) + self.y as u16;
+        self.addr_abs = ((hi << 8) | lo).overflowing_add(self.y as u16).0;
 
         if (self.addr_abs & 0xFF00) != (hi << 8) {
             1
@@ -1635,16 +1643,16 @@ impl Cpu {
     #[allow(arithmetic_overflow)]
     fn ind(&mut self) -> usize {
         let lo: u16 = self.bus.read(self.pc) as u16;
-        self.pc += 1;
+        self.pc = self.pc.overflowing_add(1).0;
         let hi: u16 = self.bus.read(self.pc) as u16;
-        self.pc += 1;
+        self.pc = self.pc.overflowing_add(1).0;
 
         let p: u16 = (hi << 8) | lo;
 
         self.addr_abs = if lo == 0x00FF {
             ((self.bus.read(p & 0x00FF) << 8) | self.bus.read(p)) as u16
         } else {
-            ((self.bus.read(p + 1) << 8) | self.bus.read(p)) as u16
+            (self.bus.read(p + 1).overflowing_shl(8).0 | self.bus.read(p)) as u16
         };
 
         0
@@ -1653,7 +1661,7 @@ impl Cpu {
     /// Zero page indirect addressing with register x offset.
     fn izx(&mut self) -> usize {
         let p: u16 = self.bus.read(self.pc) as u16;
-        self.pc += 1;
+        self.pc = self.pc.overflowing_add(1).0;
 
         let lo: u16 = self.bus.read((p + self.x as u16) & 0x00FF) as u16;
         let hi: u16 = self.bus.read((p + (self.x as u16) + 1) & 0x00FF) as u16;
@@ -1667,13 +1675,13 @@ impl Cpu {
     /// the register y offset is added onto the fetched 16 bits from memory location.
     /// It may overflow into the next page, requiring an extra cpu cycle to complete.
     fn izy(&mut self) -> usize {
-        let p: u16 = self.bus.read(self.pc) as u16;
-        self.pc += 1;
+        let t: u16 = self.bus.read(self.pc) as u16;
+        self.pc = self.pc.overflowing_add(1).0;
 
-        let lo: u16 = self.bus.read(p & 0x00FF) as u16;
-        let hi: u16 = self.bus.read((p + 1) & 0x00FF) as u16;
+        let lo = self.bus.read(t & 0x00FF) as u16;
+        let hi = self.bus.read((t + 1) & 0x00FF) as u16;
 
-        self.addr_abs = ((hi << 8) | lo) + self.y as u16;
+        self.addr_abs = ((hi << 8) | lo).overflowing_add(self.y as u16).0;
 
         if (self.addr_abs & 0xFF00) != (hi << 8) {
             1
@@ -1708,19 +1716,19 @@ impl Cpu {
     }
 
     fn brk(&mut self) -> usize {
-        self.pc += 1;
+        self.pc = self.pc.overflowing_add(1).0;
 
         self.set_flag(Flags::I, true);
 
         self.bus
             .write(0x0100 + self.sp as u16, (self.pc >> 8) & 0x00FF);
-        self.sp -= 1;
+        self.sp = self.sp.overflowing_sub(1).0;
         self.bus.write(0x0100 + self.sp as u16, self.pc & 0x00FF);
-        self.sp -= 1;
+        self.sp = self.sp.overflowing_sub(1).0;
 
         self.set_flag(Flags::B, true);
         self.bus.write(0x0100 + self.sp as u16, self.status as u16);
-        self.sp -= 1;
+        self.sp = self.sp.overflowing_sub(1).0;
         self.set_flag(Flags::B, false);
 
         self.pc = (self.bus.read(0xFFFE) as u16) | ((self.bus.read(0xFFFF) as u16) << 8);
@@ -1733,7 +1741,23 @@ impl Cpu {
     }
 
     fn asl(&mut self) -> usize {
-        todo!()
+        self.fetch();
+        self.set_flag(Flags::C, (self.fetched & 0b10000000) > 0);
+
+        let t: u8 = self.fetched.overflowing_shl(1).0;
+
+        self.set_flag(Flags::Z, t == 0);
+        self.set_flag(Flags::N, (t & 0b10000000) > 0);
+
+        if let Some(ins) = self.dispatch.get(&self.opcode) {
+            if (ins.addressmode as usize) == (Cpu::imp as usize) {
+                self.a = t;
+            } else {
+                self.bus.write(self.addr_abs, t as u16);
+            }
+        }
+
+        0
     }
 
     fn php(&mut self) -> usize {
@@ -1743,7 +1767,7 @@ impl Cpu {
         );
         self.set_flag(Flags::B, false);
         self.set_flag(Flags::U, false);
-        self.sp -= 1;
+        self.sp.overflowing_sub(1).0;
 
         0
     }
@@ -1778,11 +1802,28 @@ impl Cpu {
     }
 
     fn rol(&mut self) -> usize {
-        todo!()
+        self.fetch();
+
+        let overflow = (self.fetched & 0b10000000) > 0;
+        let operand = self.fetched.overflowing_shl(1).0 | self.get_flag(Flags::C) as u8;
+
+        self.set_flag(Flags::C, overflow);
+        self.set_flag(Flags::N, (operand & 0b10000000) > 0);
+        self.set_flag(Flags::Z, operand == 0);
+
+        if let Some(ins) = self.dispatch.get(&self.opcode) {
+            if (ins.addressmode as usize) == (Cpu::imp as usize) {
+                self.a = operand;
+            } else {
+                self.bus.write(self.addr_abs, operand as u16);
+            }
+        }
+
+        0
     }
 
     fn plp(&mut self) -> usize {
-        self.sp += 1;
+        self.sp = self.sp.overflowing_add(1).0;
         self.status = self.bus.read(0x0100 + self.sp as u16);
         self.set_flag(Flags::U, true);
 
@@ -1802,14 +1843,14 @@ impl Cpu {
     }
 
     fn rti(&mut self) -> usize {
-        self.sp += 1;
+        self.sp = self.sp.overflowing_add(1).0;
         self.status = self.bus.read(0x0100 + self.sp as u16);
         self.status &= !(Flags::B as u8);
         self.status &= !(Flags::U as u8);
 
-        self.sp += 1;
+        self.sp = self.sp.overflowing_add(1).0;
         self.pc = self.bus.read(0x0100 + self.sp as u16) as u16;
-        self.sp += 1;
+        self.sp = self.sp.overflowing_add(1).0;
         self.pc |= self.bus.read(0x0100 + self.sp as u16).overflowing_shl(8).0 as u16;
 
         0
@@ -1829,7 +1870,7 @@ impl Cpu {
         self.set_flag(Flags::N, (t & 0b10000000) > 1);
 
         if let Some(ins) = self.dispatch.get(&self.opcode) {
-            if (ins.addressmode as usize) == (Cpu::imm as usize) {
+            if (ins.addressmode as usize) == (Cpu::imp as usize) {
                 self.a = t;
             } else {
                 self.bus.write(self.addr_abs, t as u16);
@@ -1841,7 +1882,7 @@ impl Cpu {
 
     fn pha(&mut self) -> usize {
         self.bus.write(0x0100 + self.sp as u16, self.a as u16);
-        self.sp -= 1;
+        self.sp = self.sp.overflowing_sub(1).0;
 
         0
     }
@@ -1884,11 +1925,27 @@ impl Cpu {
     }
 
     fn ror(&mut self) -> usize {
-        todo!()
+        self.fetch();
+        let t = ((self.get_flag(Flags::C) as u8) << 7) as u16
+            | self.fetched.overflowing_shr(1).0 as u16;
+
+        self.set_flag(Flags::C, (self.fetched & 0x01) > 0);
+        self.set_flag(Flags::Z, (t & 0x00FF) == 0x00);
+        self.set_flag(Flags::N, (t & 0x0080) > 0);
+
+        if let Some(ins) = self.dispatch.get(&self.opcode) {
+            if (ins.addressmode as usize) == (Cpu::imp as usize) {
+                self.a = (t & 0x00FF) as u8;
+            } else {
+                self.bus.write(self.addr_abs, t & 0x00FF);
+            }
+        }
+
+        0
     }
 
     fn pla(&mut self) -> usize {
-        self.sp += 1;
+        self.sp = self.sp.overflowing_add(1).0;
         self.a = self.bus.read(0x0100 + self.sp as u16);
 
         self.set_flag(Flags::Z, self.a == 0);
@@ -2036,15 +2093,41 @@ impl Cpu {
     }
 
     fn cpy(&mut self) -> usize {
-        todo!()
+        self.fetch();
+
+        self.set_flag(Flags::C, self.y >= self.fetched);
+        self.set_flag(Flags::Z, self.y == self.fetched);
+        self.set_flag(
+            Flags::N,
+            ((self.y.overflowing_sub(self.fetched).0) & 0b10000000) > 0,
+        );
+
+        0
     }
 
     fn cmp(&mut self) -> usize {
-        todo!()
+        self.fetch();
+
+        self.set_flag(Flags::C, self.a >= self.fetched);
+        self.set_flag(Flags::Z, self.a == self.fetched);
+        self.set_flag(
+            Flags::N,
+            ((self.a.overflowing_sub(self.fetched).0) & 0b10000000) > 0,
+        );
+
+        0
     }
 
     fn dec(&mut self) -> usize {
-        todo!()
+        self.fetch();
+
+        let value = self.fetched.overflowing_sub(1).0;
+        self.bus.write(self.addr_abs, value as u16);
+
+        self.set_flag(Flags::Z, value == 0);
+        self.set_flag(Flags::N, (value & 0b10000000) > 0);
+
+        0
     }
 
     fn iny(&mut self) -> usize {
@@ -2077,7 +2160,16 @@ impl Cpu {
     }
 
     fn cpx(&mut self) -> usize {
-        todo!()
+        self.fetch();
+
+        self.set_flag(Flags::C, self.x >= self.fetched);
+        self.set_flag(Flags::Z, self.x == self.fetched);
+        self.set_flag(
+            Flags::N,
+            ((self.x.overflowing_sub(self.fetched).0) & 0b10000000) > 0,
+        );
+
+        0
     }
 
     fn sbc(&mut self) -> usize {
@@ -2099,7 +2191,15 @@ impl Cpu {
     }
 
     fn inc(&mut self) -> usize {
-        todo!()
+        self.fetch();
+
+        let value: u8 = self.fetched.overflowing_add(1).0;
+        self.bus.write(self.addr_abs, value as u16);
+
+        self.set_flag(Flags::N, (value & 0b10000000) > 0);
+        self.set_flag(Flags::Z, value == 0);
+
+        1
     }
 
     fn inx(&mut self) -> usize {
@@ -2173,14 +2273,17 @@ mod tests {
             cpu.y = test_case.initial_state.y;
             cpu.status = test_case.initial_state.p;
 
+            cpu.cycles = 0;
+
             for (address, value) in test_case.initial_state.ram.iter() {
                 cpu.bus.write(*address, (*value) as u16);
             }
 
-            // Execute all steps
-            for (pc, _, _) in test_case.cycles.iter() {
-                while cpu.pc == *pc {
-                    cpu.clock();
+            loop {
+                cpu.clock();
+
+                if cpu.complete() {
+                    break;
                 }
             }
 
