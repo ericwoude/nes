@@ -36,7 +36,7 @@ pub struct Cpu {
     pub opcode: u8,
     pub cycles: usize,
 
-    pub dispatch: HashMap<u8, Instruction>,
+    dispatch: HashMap<u8, Instruction>,
 }
 
 impl Cpu {
@@ -2116,5 +2116,85 @@ impl Cpu {
         self.set_flag(Flags::D, true);
 
         0
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    extern crate test_generator;
+
+    use serde::Deserialize;
+    use test_generator::test_resources;
+
+    use std::fs;
+    use std::fs::File;
+    use std::io::BufReader;
+    use std::path::PathBuf;
+
+    use crate::cpu::Cpu;
+
+    #[derive(Debug, Deserialize)]
+    struct CpuState {
+        pc: u16,
+        s: u8,
+        a: u8,
+        x: u8,
+        y: u8,
+        p: u8,
+        ram: Vec<(u16, u8)>,
+    }
+
+    #[derive(Debug, Deserialize)]
+    struct TestCase {
+        name: String,
+        #[serde(rename = "initial")]
+        initial_state: CpuState,
+        #[serde(rename = "final")]
+        final_state: CpuState,
+        cycles: Vec<(u16, u8, String)>,
+    }
+
+    #[test_resources("tests/*.json")]
+    fn operation(resource: &str) {
+        let file = File::open(resource).unwrap();
+        let reader = BufReader::new(file);
+        let test_cases: Vec<TestCase> =
+            serde_json::from_reader(reader).expect("Problem reading file");
+
+        for test_case in test_cases.iter() {
+            // Filling CPU state
+            let mut cpu = Cpu::new();
+            cpu.reset();
+
+            cpu.pc = test_case.initial_state.pc;
+            cpu.sp = test_case.initial_state.s;
+            cpu.a = test_case.initial_state.a;
+            cpu.x = test_case.initial_state.x;
+            cpu.y = test_case.initial_state.y;
+            cpu.status = test_case.initial_state.p;
+
+            for (address, value) in test_case.initial_state.ram.iter() {
+                cpu.bus.write(*address, (*value) as u16);
+            }
+
+            // Execute all steps
+            for (pc, _, _) in test_case.cycles.iter() {
+                while cpu.pc == *pc {
+                    cpu.clock();
+                }
+            }
+
+            // State comparison
+            assert_eq!(cpu.pc, test_case.final_state.pc);
+            assert_eq!(cpu.sp, test_case.final_state.s);
+            assert_eq!(cpu.a, test_case.final_state.a);
+            assert_eq!(cpu.x, test_case.final_state.x);
+            assert_eq!(cpu.y, test_case.final_state.y);
+            assert_eq!(cpu.status, test_case.final_state.p);
+
+            for (address, value) in test_case.final_state.ram.iter() {
+                assert_eq!(*value, cpu.bus.read(*address))
+            }
+        }
     }
 }
