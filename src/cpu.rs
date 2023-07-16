@@ -22,21 +22,21 @@ struct Instruction {
 }
 
 pub struct Cpu {
-    a: u8,
-    x: u8,
-    y: u8,
-    sp: u8,
-    pc: u16,
-    status: u8,
-    bus: Bus,
+    pub a: u8,
+    pub x: u8,
+    pub y: u8,
+    pub sp: u8,
+    pub pc: u16,
+    pub status: u8,
+    pub bus: Bus,
 
-    fetched: u8,
-    addr_abs: u16,
-    addr_rel: u16,
-    opcode: u8,
-    cycles: usize,
+    pub fetched: u8,
+    pub addr_abs: u16,
+    pub addr_rel: u16,
+    pub opcode: u8,
+    pub cycles: usize,
 
-    dispatch: HashMap<u8, Instruction>,
+    pub dispatch: HashMap<u8, Instruction>,
 }
 
 impl Cpu {
@@ -1458,7 +1458,8 @@ impl Cpu {
                 .dispatch
                 .get(&self.opcode)
                 .copied()
-                .expect("Unknown instruction");
+                .expect("opcode should be in dispatch table");
+
             self.cycles = instruction.cycles;
 
             let addr_cycles = (instruction.addressmode)(self);
@@ -1819,7 +1820,23 @@ impl Cpu {
     }
 
     fn lsr(&mut self) -> usize {
-        todo!()
+        self.fetch();
+        self.set_flag(Flags::C, (self.fetched & 0x0001) > 0);
+
+        let t: u8 = self.fetched.overflowing_shr(1).0;
+
+        self.set_flag(Flags::Z, t == 0);
+        self.set_flag(Flags::N, (t & 0b10000000) > 1);
+
+        if let Some(ins) = self.dispatch.get(&self.opcode) {
+            if (ins.addressmode as usize) == (Cpu::imm as usize) {
+                self.a = t;
+            } else {
+                self.bus.write(self.addr_abs, t as u16);
+            }
+        }
+
+        0
     }
 
     fn pha(&mut self) -> usize {
