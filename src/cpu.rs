@@ -1793,14 +1793,14 @@ impl Cpu {
     }
 
     fn jsr(&mut self) -> usize {
-        self.sp = self.sp.overflowing_sub(1).0;
+        self.pc = self.pc.overflowing_sub(1).0;
 
         self.bus.write(
             0x0100 + self.sp as u16,
-            ((self.pc).overflowing_shr(8).0) & 0x00FF,
+            (self.pc.overflowing_shr(8).0) & 0x00FF,
         );
         self.sp = self.sp.overflowing_sub(1).0;
-        self.bus.write(0x0100 + self.sp as u16, (self.pc) & 0x00FF);
+        self.bus.write(0x0100 + self.sp as u16, self.pc & 0x00FF);
         self.sp = self.sp.overflowing_sub(1).0;
 
         self.pc = self.addr_abs;
@@ -1852,7 +1852,9 @@ impl Cpu {
     fn plp(&mut self) -> usize {
         self.sp = self.sp.overflowing_add(1).0;
         self.status = self.bus.read(0x0100 + self.sp as u16);
+
         self.set_flag(Flags::U, true);
+        self.set_flag(Flags::B, false);
 
         0
     }
@@ -1878,7 +1880,9 @@ impl Cpu {
         self.sp = self.sp.overflowing_add(1).0;
         self.pc = self.bus.read(0x0100 + self.sp as u16) as u16;
         self.sp = self.sp.overflowing_add(1).0;
-        self.pc |= self.bus.read(0x0100 + self.sp as u16).overflowing_shl(8).0 as u16;
+        self.pc |= (self.bus.read(0x0100 + self.sp as u16) as u16)
+            .overflowing_shl(8)
+            .0;
 
         0
     }
@@ -1953,16 +1957,17 @@ impl Cpu {
     fn adc(&mut self) -> usize {
         self.fetch();
 
-        let res: u16 = self.a as u16 + self.fetched as u16 + self.get_flag(Flags::C) as u16;
-        let overflow: bool =
-            ((!((self.a as u16) ^ (self.fetched as u16)) & ((self.a as u16) ^ res)) & 0x0080) > 0;
+        let result: u16 = self.a as u16 + self.fetched as u16 + self.get_flag(Flags::C) as u16;
+        let overflow =
+            (!((self.a as u16) ^ (self.fetched as u16))) & ((self.a as u16) ^ result) & 0x80;
 
-        self.set_flag(Flags::C, res > 255);
-        self.set_flag(Flags::Z, (res & 0x00FF) == 0);
-        self.set_flag(Flags::N, (res & 0b10000000) > 0);
-        self.set_flag(Flags::V, overflow);
+        self.set_flag(Flags::C, result > 0xFF);
+        self.set_flag(Flags::V, overflow > 0);
 
-        self.a = (res & 0x00FF) as u8;
+        self.a = result as u8;
+
+        self.set_flag(Flags::Z, self.a == 0);
+        self.set_flag(Flags::N, self.a & 0b10000000 > 0);
 
         1
     }
@@ -2222,18 +2227,19 @@ impl Cpu {
 
     fn sbc(&mut self) -> usize {
         self.fetch();
+        self.fetched = !self.fetched;
 
-        let operand: u16 = (self.fetched as u16) ^ 0x00FF;
-        let res: u16 = self.a as u16 + operand + self.get_flag(Flags::C) as u16;
-        let overflow: bool =
-            ((!((self.a as u16) ^ (self.fetched as u16)) & ((self.a as u16) ^ res)) & 0x0080) > 0;
+        let result: u16 = self.a as u16 + self.fetched as u16 + self.get_flag(Flags::C) as u16;
+        let overflow =
+            (!((self.a as u16) ^ (self.fetched as u16))) & ((self.a as u16) ^ result) & 0x80;
 
-        self.set_flag(Flags::C, res > 255);
-        self.set_flag(Flags::Z, (res & 0x00FF) == 0);
-        self.set_flag(Flags::N, (res & 0b10000000) > 0);
-        self.set_flag(Flags::V, overflow);
+        self.set_flag(Flags::C, result > 0xFF);
+        self.set_flag(Flags::V, overflow > 0);
 
-        self.a = (res & 0x00FF) as u8;
+        self.a = result as u8;
+
+        self.set_flag(Flags::Z, self.a == 0);
+        self.set_flag(Flags::N, self.a & 0b10000000 > 0);
 
         1
     }
@@ -2349,7 +2355,7 @@ mod tests {
             assert_eq!(cpu.status, test_case.final_state.p);
 
             for (address, value) in test_case.final_state.ram.iter() {
-                assert_eq!(*value, cpu.bus.read(*address))
+                assert_eq!(cpu.bus.read(*address), *value)
             }
         }
     }
