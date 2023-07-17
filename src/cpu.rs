@@ -1635,24 +1635,28 @@ impl Cpu {
         }
     }
 
-    /// Indirect addressing first fetches a 16 bit pointer from
-    /// location in memory at the program counter. Then it uses the
-    /// pointer to locate to the actual address in memory.
+    /// Indirect addressing first fetches a 16 bit pointer `target`
+    /// It will use the target location in memory to fetch the effective
+    /// target (actual address).
     ///
-    /// Simulates page boundary hardware bug.
-    #[allow(arithmetic_overflow)]
+    /// Simulates boundary hardware bug of page overload.
     fn ind(&mut self) -> usize {
         let lo: u16 = self.bus.read(self.pc) as u16;
         self.pc = self.pc.overflowing_add(1).0;
         let hi: u16 = self.bus.read(self.pc) as u16;
         self.pc = self.pc.overflowing_add(1).0;
-
-        let p: u16 = (hi << 8) | lo;
+        let target = hi.overflowing_shl(8).0 | lo;
 
         self.addr_abs = if lo == 0x00FF {
-            ((self.bus.read(p & 0x00FF) << 8) | self.bus.read(p)) as u16
+            let effective_lo = self.bus.read(target) as u16;
+            let effective_hi = self.bus.read(target & 0xFF00) as u16;
+
+            effective_hi.overflowing_shl(8).0 | effective_lo
         } else {
-            (self.bus.read(p + 1).overflowing_shl(8).0 | self.bus.read(p)) as u16
+            let effective_lo = self.bus.read(target) as u16;
+            let effective_hi = self.bus.read(target + 1) as u16;
+
+            effective_hi.overflowing_shl(8).0 | effective_lo
         };
 
         0
@@ -1716,10 +1720,6 @@ impl Cpu {
     }
 
     fn brk(&mut self) -> usize {
-        self.pc = self.pc.overflowing_add(1).0;
-
-        self.set_flag(Flags::I, true);
-
         self.bus
             .write(0x0100 + self.sp as u16, (self.pc >> 8) & 0x00FF);
         self.sp = self.sp.overflowing_sub(1).0;
@@ -1731,8 +1731,9 @@ impl Cpu {
         self.sp = self.sp.overflowing_sub(1).0;
         self.set_flag(Flags::B, false);
 
-        self.pc = (self.bus.read(0xFFFE) as u16) | ((self.bus.read(0xFFFF) as u16) << 8);
+        self.pc = self.bus.read(0xFFFE) as u16 | (self.bus.read(0xFFFF as u16) as u16) << 8;
 
+        self.set_flag(Flags::I, true);
         0
     }
 
