@@ -1817,8 +1817,15 @@ impl Cpu {
 
         1
     }
+
     fn bit(&mut self) -> usize {
-        todo!()
+        self.fetch();
+
+        self.set_flag(Flags::Z, (self.a & self.fetched) == 0);
+        self.set_flag(Flags::N, self.fetched & (1 << 7) > 0);
+        self.set_flag(Flags::V, self.fetched & (1 << 6) > 0);
+
+        0
     }
 
     fn rol(&mut self) -> usize {
@@ -1877,7 +1884,14 @@ impl Cpu {
     }
 
     fn eor(&mut self) -> usize {
-        todo!()
+        self.fetch();
+
+        self.a ^= self.fetched;
+
+        self.set_flag(Flags::Z, self.a == 0);
+        self.set_flag(Flags::N, (self.a & 0b10000000) > 1);
+
+        0
     }
 
     fn lsr(&mut self) -> usize {
