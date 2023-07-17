@@ -1737,7 +1737,14 @@ impl Cpu {
     }
 
     fn ora(&mut self) -> usize {
-        todo!()
+        self.fetch();
+
+        self.a |= self.fetched;
+
+        self.set_flag(Flags::Z, self.a == 0);
+        self.set_flag(Flags::N, (self.a & 0b10000000) > 0);
+
+        0
     }
 
     fn asl(&mut self) -> usize {
@@ -1765,9 +1772,10 @@ impl Cpu {
             0x0100 + self.sp as u16,
             (self.status | Flags::B as u8 | Flags::U as u8) as u16,
         );
+        self.sp = self.sp.overflowing_sub(1).0;
+
         self.set_flag(Flags::B, false);
         self.set_flag(Flags::U, false);
-        self.sp.overflowing_sub(1).0;
 
         0
     }
@@ -1785,7 +1793,19 @@ impl Cpu {
     }
 
     fn jsr(&mut self) -> usize {
-        todo!()
+        self.sp = self.sp.overflowing_sub(1).0;
+
+        self.bus.write(
+            0x0100 + self.sp as u16,
+            ((self.pc).overflowing_shr(8).0) & 0x00FF,
+        );
+        self.sp = self.sp.overflowing_sub(1).0;
+        self.bus.write(0x0100 + self.sp as u16, (self.pc) & 0x00FF);
+        self.sp = self.sp.overflowing_sub(1).0;
+
+        self.pc = self.addr_abs;
+
+        0
     }
 
     fn and(&mut self) -> usize {
@@ -1888,7 +1908,9 @@ impl Cpu {
     }
 
     fn jmp(&mut self) -> usize {
-        todo!()
+        self.pc = self.addr_abs;
+
+        0
     }
 
     fn bvc(&mut self) -> usize {
@@ -1904,7 +1926,14 @@ impl Cpu {
     }
 
     fn rts(&mut self) -> usize {
-        todo!()
+        self.sp = self.sp.overflowing_add(1).0;
+        let lo: u16 = self.bus.read(0x0100 + self.sp as u16) as u16;
+        self.sp = self.sp.overflowing_add(1).0;
+        let hi: u16 = self.bus.read(0x0100 + self.sp as u16) as u16;
+
+        self.pc = (hi.overflowing_shl(8).0 | lo).overflowing_add(1).0;
+
+        0
     }
 
     fn adc(&mut self) -> usize {
