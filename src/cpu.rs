@@ -2,7 +2,7 @@ use crate::bus::Bus;
 
 use std::collections::HashMap;
 
-pub enum Flags {
+enum Flags {
     C = (1 << 0), // carry bit
     Z = (1 << 1), // zero
     I = (1 << 2), // disable interrupts
@@ -14,21 +14,21 @@ pub enum Flags {
 }
 
 #[derive(Clone, Copy)]
-struct Instruction {
+struct Instruction<'a> {
     name: &'static str,
-    operation: fn(&mut Cpu) -> usize,
-    addressmode: fn(&mut Cpu) -> usize,
+    operation: fn(&mut Cpu<'a>) -> usize,
+    addressmode: fn(&mut Cpu<'a>) -> usize,
     cycles: usize,
 }
 
-pub struct Cpu {
+pub struct Cpu<'a> {
     pub a: u8,
     pub x: u8,
     pub y: u8,
     pub sp: u8,
     pub pc: u16,
     pub status: u8,
-    pub bus: Bus,
+    pub bus: &'a mut Bus,
 
     pub fetched: u8,
     pub addr_abs: u16,
@@ -36,19 +36,19 @@ pub struct Cpu {
     pub opcode: u8,
     pub cycles: usize,
 
-    dispatch: HashMap<u8, Instruction>,
+    dispatch: HashMap<u8, Instruction<'a>>,
 }
 
-impl Cpu {
-    pub fn new() -> Cpu {
+impl<'a> Cpu<'a> {
+    pub fn new(bus: &'a mut Bus) -> Cpu<'a> {
         Cpu {
             a: 0x00,
             x: 0x00,
             y: 0x00,
-            sp: 0x00,
+            sp: 0xFD,
             pc: 0x0000,
-            status: 0x00,
-            bus: Bus::new(),
+            status: 0x34,
+            bus: bus,
 
             fetched: 0x00,
             addr_abs: 0x0000,
@@ -1475,26 +1475,12 @@ impl Cpu {
     }
 
     pub fn complete(&self) -> bool {
-        return self.cycles == 0;
+        self.cycles == 0
     }
 
     pub fn reset(&mut self) {
-        self.a = 0x00;
-        self.x = 0x00;
-        self.y = 0x00;
-        self.sp = 0xFD;
-        self.status = Flags::U as u8;
-
-        self.addr_abs = 0xFFFC;
-        let lo: u16 = self.bus.read(self.addr_abs) as u16;
-        let hi: u16 = self.bus.read(self.addr_abs + 1) as u16;
-        self.pc = (hi << 8) | lo;
-
-        self.fetched = 0x00;
-        self.addr_rel = 0x0000;
-        self.addr_abs = 0x0000;
-
-        self.cycles = 8;
+        self.sp = self.sp.overflowing_sub(3).0;
+        self.set_flag(Flags::I, true);
     }
 
     fn irq(&mut self) {
@@ -2291,6 +2277,7 @@ mod tests {
     use std::io::BufReader;
     use std::path::PathBuf;
 
+    use crate::bus::Bus;
     use crate::cpu::Cpu;
 
     #[derive(Debug, Deserialize)]
@@ -2323,7 +2310,8 @@ mod tests {
 
         for test_case in test_cases.iter() {
             // Filling CPU state
-            let mut cpu = Cpu::new();
+            let mut bus = Bus::new();
+            let mut cpu = Cpu::new(&mut bus);
             cpu.reset();
 
             cpu.pc = test_case.initial_state.pc;
@@ -2336,7 +2324,7 @@ mod tests {
             cpu.cycles = 0;
 
             for (address, value) in test_case.initial_state.ram.iter() {
-                cpu.bus.write(*address, (*value) as u16);
+                cpu.bus.write(*address, *value as u16);
             }
 
             loop {
