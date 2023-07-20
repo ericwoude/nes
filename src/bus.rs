@@ -9,15 +9,17 @@ impl Bus {
         }
     }
 
-    pub fn write(&mut self, addr: u16, data: u16) {
-        match addr {
-            0x0000..=0xFFFF => self.ram[addr as usize] = data as u8,
+    pub fn write<T: Into<u16>>(&mut self, addr: T, data: u8) {
+        let address = addr.into();
+        match address {
+            0x0000..=0xFFFF => self.ram[address as usize] = data,
         }
     }
 
-    pub fn read(&self, addr: u16) -> u8 {
-        match addr {
-            0x0000..=0xFFFF => self.ram[addr as usize],
+    pub fn read<T: Into<u16>>(&self, addr: T) -> u8 {
+        let address = addr.into();
+        match address {
+            0x0000..=0xFFFF => self.ram[address as usize],
         }
     }
 }
