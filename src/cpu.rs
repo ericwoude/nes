@@ -2,7 +2,7 @@ use crate::bus::Bus;
 
 use std::collections::HashMap;
 
-enum Flags {
+enum Flag {
     C = (1 << 0), // carry bit
     Z = (1 << 1), // zero
     I = (1 << 2), // disable interrupts
@@ -10,7 +10,7 @@ enum Flags {
     B = (1 << 4), // break
     U = (1 << 5), // unused
     V = (1 << 6), // overflow
-    N = (1 << 7), // negative
+    N = (1 << 7), // negative`
 }
 
 #[derive(Clone, Copy)]
@@ -2365,14 +2365,14 @@ impl<'a> Cpu<'a> {
         }
     }
 
-    fn set_flag(&mut self, flag: Flags, value: bool) {
+    fn set_flag(&mut self, flag: Flag, value: bool) {
         match value {
             true => self.status |= flag as u8,
             false => self.status &= !(flag as u8),
         }
     }
 
-    fn get_flag(&self, flag: Flags) -> bool {
+    fn get_flag(&self, flag: Flag) -> bool {
         self.status & (flag as u8) != 0
     }
 
@@ -2380,7 +2380,7 @@ impl<'a> Cpu<'a> {
         if self.cycles == 0 {
             self.opcode = self.bus.read(self.pc);
             self.pc = self.pc.wrapping_add(1);
-            self.set_flag(Flags::U, true);
+            self.set_flag(Flag::U, true);
 
             let instruction = self
                 .dispatch
@@ -2394,7 +2394,7 @@ impl<'a> Cpu<'a> {
 
             self.cycles += addr_cycles & op_cycles;
 
-            self.set_flag(Flags::U, true);
+            self.set_flag(Flag::U, true);
         }
 
         self.cycles -= 1;
@@ -2406,11 +2406,11 @@ impl<'a> Cpu<'a> {
 
     pub fn reset(&mut self) {
         self.sp = self.sp.wrapping_sub(3);
-        self.set_flag(Flags::I, true);
+        self.set_flag(Flag::I, true);
     }
 
     fn irq(&mut self) {
-        if !self.get_flag(Flags::I) {
+        if !self.get_flag(Flag::I) {
             self.nmi();
         }
     }
@@ -2423,9 +2423,9 @@ impl<'a> Cpu<'a> {
             .write(0x0100 + self.sp as u16, (self.pc & 0x00FF) as u8);
         self.sp = self.sp.wrapping_sub(1);
 
-        self.set_flag(Flags::B, false);
-        self.set_flag(Flags::U, true);
-        self.set_flag(Flags::I, true);
+        self.set_flag(Flag::B, false);
+        self.set_flag(Flag::U, true);
+        self.set_flag(Flag::I, true);
         self.bus.write(0x0100 + self.sp as u16, self.status);
         self.sp = self.sp.wrapping_sub(1);
 
@@ -2618,7 +2618,7 @@ impl<'a> Cpu<'a> {
         self.fetched
     }
 
-    fn conditional_branch(&mut self, flag: Flags, status: bool) {
+    fn conditional_branch(&mut self, flag: Flag, status: bool) {
         if self.get_flag(flag) == status {
             self.cycles += 1;
 
@@ -2640,17 +2640,17 @@ impl<'a> Cpu<'a> {
             .write(0x0100 + self.sp as u16, (self.pc & 0x00FF) as u8);
         self.sp = self.sp.wrapping_sub(1);
 
-        self.set_flag(Flags::B, true);
+        self.set_flag(Flag::B, true);
         self.bus.write(0x0100 + self.sp as u16, self.status);
         self.sp = self.sp.wrapping_sub(1);
-        self.set_flag(Flags::B, false);
+        self.set_flag(Flag::B, false);
 
         // self.pc = self.bus.read(0xFFFE) as u16 | (self.bus.read(0xFFFF as u16) as u16) << 8;
         let lo = self.bus.read(0xFFFEu16) as u16;
         let hi = self.bus.read(0xFFFFu16) as u16;
         let addr = hi << 8 | lo;
         self.pc = addr;
-        self.set_flag(Flags::I, true);
+        self.set_flag(Flag::I, true);
         0
     }
 
@@ -2659,20 +2659,20 @@ impl<'a> Cpu<'a> {
 
         self.a |= self.fetched;
 
-        self.set_flag(Flags::Z, self.a == 0);
-        self.set_flag(Flags::N, (self.a & 0b10000000) > 0);
+        self.set_flag(Flag::Z, self.a == 0);
+        self.set_flag(Flag::N, (self.a & 0b10000000) > 0);
 
         0
     }
 
     fn asl(&mut self) -> usize {
         self.fetch();
-        self.set_flag(Flags::C, (self.fetched & 0b10000000) > 0);
+        self.set_flag(Flag::C, (self.fetched & 0b10000000) > 0);
 
         let t: u8 = self.fetched.wrapping_shl(1);
 
-        self.set_flag(Flags::Z, t == 0);
-        self.set_flag(Flags::N, (t & 0b10000000) > 0);
+        self.set_flag(Flag::Z, t == 0);
+        self.set_flag(Flag::N, (t & 0b10000000) > 0);
 
         if let Some(ins) = self.dispatch.get(&self.opcode) {
             if (ins.addressmode as usize) == (Cpu::imp as usize) {
@@ -2688,24 +2688,24 @@ impl<'a> Cpu<'a> {
     fn php(&mut self) -> usize {
         self.bus.write(
             0x0100 + self.sp as u16,
-            self.status | Flags::B as u8 | Flags::U as u8,
+            self.status | Flag::B as u8 | Flag::U as u8,
         );
         self.sp = self.sp.wrapping_sub(1);
 
-        self.set_flag(Flags::B, false);
-        self.set_flag(Flags::U, false);
+        self.set_flag(Flag::B, false);
+        self.set_flag(Flag::U, false);
 
         0
     }
 
     fn bpl(&mut self) -> usize {
-        self.conditional_branch(Flags::N, false);
+        self.conditional_branch(Flag::N, false);
 
         0
     }
 
     fn clc(&mut self) -> usize {
-        self.set_flag(Flags::C, false);
+        self.set_flag(Flag::C, false);
 
         0
     }
@@ -2731,8 +2731,8 @@ impl<'a> Cpu<'a> {
         self.fetch();
         self.a &= self.fetched;
 
-        self.set_flag(Flags::Z, self.a == 0x00);
-        self.set_flag(Flags::N, (self.a & 0b10000000) > 0);
+        self.set_flag(Flag::Z, self.a == 0x00);
+        self.set_flag(Flag::N, (self.a & 0b10000000) > 0);
 
         1
     }
@@ -2740,9 +2740,9 @@ impl<'a> Cpu<'a> {
     fn bit(&mut self) -> usize {
         self.fetch();
 
-        self.set_flag(Flags::Z, (self.a & self.fetched) == 0);
-        self.set_flag(Flags::N, self.fetched & (1 << 7) > 0);
-        self.set_flag(Flags::V, self.fetched & (1 << 6) > 0);
+        self.set_flag(Flag::Z, (self.a & self.fetched) == 0);
+        self.set_flag(Flag::N, self.fetched & (1 << 7) > 0);
+        self.set_flag(Flag::V, self.fetched & (1 << 6) > 0);
 
         0
     }
@@ -2751,11 +2751,11 @@ impl<'a> Cpu<'a> {
         self.fetch();
 
         let overflow = (self.fetched & 0b10000000) > 0;
-        let operand = self.fetched.wrapping_shl(1) | self.get_flag(Flags::C) as u8;
+        let operand = self.fetched.wrapping_shl(1) | self.get_flag(Flag::C) as u8;
 
-        self.set_flag(Flags::C, overflow);
-        self.set_flag(Flags::N, (operand & 0b10000000) > 0);
-        self.set_flag(Flags::Z, operand == 0);
+        self.set_flag(Flag::C, overflow);
+        self.set_flag(Flag::N, (operand & 0b10000000) > 0);
+        self.set_flag(Flag::Z, operand == 0);
 
         if let Some(ins) = self.dispatch.get(&self.opcode) {
             if (ins.addressmode as usize) == (Cpu::imp as usize) {
@@ -2772,20 +2772,20 @@ impl<'a> Cpu<'a> {
         self.sp = self.sp.wrapping_add(1);
         self.status = self.bus.read(0x0100 + self.sp as u16);
 
-        self.set_flag(Flags::U, true);
-        self.set_flag(Flags::B, false);
+        self.set_flag(Flag::U, true);
+        self.set_flag(Flag::B, false);
 
         0
     }
 
     fn bmi(&mut self) -> usize {
-        self.conditional_branch(Flags::N, true);
+        self.conditional_branch(Flag::N, true);
 
         0
     }
 
     fn sec(&mut self) -> usize {
-        self.set_flag(Flags::C, true);
+        self.set_flag(Flag::C, true);
 
         1
     }
@@ -2793,8 +2793,8 @@ impl<'a> Cpu<'a> {
     fn rti(&mut self) -> usize {
         self.sp = self.sp.wrapping_add(1);
         self.status = self.bus.read(0x0100 + self.sp as u16);
-        self.status &= !(Flags::B as u8);
-        self.status &= !(Flags::U as u8);
+        self.status &= !(Flag::B as u8);
+        self.status &= !(Flag::U as u8);
 
         self.sp = self.sp.wrapping_add(1);
         self.pc = self.bus.read(0x0100 + self.sp as u16) as u16;
@@ -2809,20 +2809,20 @@ impl<'a> Cpu<'a> {
 
         self.a ^= self.fetched;
 
-        self.set_flag(Flags::Z, self.a == 0);
-        self.set_flag(Flags::N, (self.a & 0b10000000) > 1);
+        self.set_flag(Flag::Z, self.a == 0);
+        self.set_flag(Flag::N, (self.a & 0b10000000) > 1);
 
         0
     }
 
     fn lsr(&mut self) -> usize {
         self.fetch();
-        self.set_flag(Flags::C, (self.fetched & 0x0001) > 0);
+        self.set_flag(Flag::C, (self.fetched & 0x0001) > 0);
 
         let t: u8 = self.fetched.wrapping_shr(1);
 
-        self.set_flag(Flags::Z, t == 0);
-        self.set_flag(Flags::N, (t & 0b10000000) > 1);
+        self.set_flag(Flag::Z, t == 0);
+        self.set_flag(Flag::N, (t & 0b10000000) > 1);
 
         if let Some(ins) = self.dispatch.get(&self.opcode) {
             if (ins.addressmode as usize) == (Cpu::imp as usize) {
@@ -2849,13 +2849,13 @@ impl<'a> Cpu<'a> {
     }
 
     fn bvc(&mut self) -> usize {
-        self.conditional_branch(Flags::V, false);
+        self.conditional_branch(Flag::V, false);
 
         0
     }
 
     fn cli(&mut self) -> usize {
-        self.set_flag(Flags::I, false);
+        self.set_flag(Flag::I, false);
 
         0
     }
@@ -2874,28 +2874,28 @@ impl<'a> Cpu<'a> {
     fn adc(&mut self) -> usize {
         self.fetch();
 
-        let result: u16 = self.a as u16 + self.fetched as u16 + self.get_flag(Flags::C) as u16;
+        let result: u16 = self.a as u16 + self.fetched as u16 + self.get_flag(Flag::C) as u16;
         let overflow =
             (!((self.a as u16) ^ (self.fetched as u16))) & ((self.a as u16) ^ result) & 0x80;
 
-        self.set_flag(Flags::C, result > 0xFF);
-        self.set_flag(Flags::V, overflow > 0);
+        self.set_flag(Flag::C, result > 0xFF);
+        self.set_flag(Flag::V, overflow > 0);
 
         self.a = result as u8;
 
-        self.set_flag(Flags::Z, self.a == 0);
-        self.set_flag(Flags::N, self.a & 0b10000000 > 0);
+        self.set_flag(Flag::Z, self.a == 0);
+        self.set_flag(Flag::N, self.a & 0b10000000 > 0);
 
         1
     }
 
     fn ror(&mut self) -> usize {
         self.fetch();
-        let t = ((self.get_flag(Flags::C) as u8) << 7) as u16 | self.fetched.wrapping_shr(1) as u16;
+        let t = ((self.get_flag(Flag::C) as u8) << 7) as u16 | self.fetched.wrapping_shr(1) as u16;
 
-        self.set_flag(Flags::C, (self.fetched & 0x01) > 0);
-        self.set_flag(Flags::Z, (t & 0x00FF) == 0x00);
-        self.set_flag(Flags::N, (t & 0x0080) > 0);
+        self.set_flag(Flag::C, (self.fetched & 0x01) > 0);
+        self.set_flag(Flag::Z, (t & 0x00FF) == 0x00);
+        self.set_flag(Flag::N, (t & 0x0080) > 0);
 
         if let Some(ins) = self.dispatch.get(&self.opcode) {
             if (ins.addressmode as usize) == (Cpu::imp as usize) {
@@ -2912,20 +2912,20 @@ impl<'a> Cpu<'a> {
         self.sp = self.sp.wrapping_add(1);
         self.a = self.bus.read(0x0100 + self.sp as u16);
 
-        self.set_flag(Flags::Z, self.a == 0);
-        self.set_flag(Flags::N, (self.a & 0b10000000) > 0);
+        self.set_flag(Flag::Z, self.a == 0);
+        self.set_flag(Flag::N, (self.a & 0b10000000) > 0);
 
         0
     }
 
     fn bvs(&mut self) -> usize {
-        self.conditional_branch(Flags::V, true);
+        self.conditional_branch(Flag::V, true);
 
         0
     }
 
     fn sei(&mut self) -> usize {
-        self.set_flag(Flags::I, true);
+        self.set_flag(Flag::I, true);
 
         0
     }
@@ -2951,8 +2951,8 @@ impl<'a> Cpu<'a> {
     fn dey(&mut self) -> usize {
         self.y = self.y.wrapping_sub(1);
 
-        self.set_flag(Flags::Z, self.y == 0);
-        self.set_flag(Flags::N, (self.y & 0b10000000) > 0);
+        self.set_flag(Flag::Z, self.y == 0);
+        self.set_flag(Flag::N, (self.y & 0b10000000) > 0);
 
         0
     }
@@ -2960,14 +2960,14 @@ impl<'a> Cpu<'a> {
     fn txa(&mut self) -> usize {
         self.a = self.x;
 
-        self.set_flag(Flags::Z, self.a == 0);
-        self.set_flag(Flags::N, (self.a & 0b10000000) > 0);
+        self.set_flag(Flag::Z, self.a == 0);
+        self.set_flag(Flag::N, (self.a & 0b10000000) > 0);
 
         0
     }
 
     fn bcc(&mut self) -> usize {
-        self.conditional_branch(Flags::C, false);
+        self.conditional_branch(Flag::C, false);
 
         0
     }
@@ -2975,8 +2975,8 @@ impl<'a> Cpu<'a> {
     fn tya(&mut self) -> usize {
         self.a = self.y;
 
-        self.set_flag(Flags::Z, self.a == 0);
-        self.set_flag(Flags::N, (self.a & 0b10000000) > 0);
+        self.set_flag(Flag::Z, self.a == 0);
+        self.set_flag(Flag::N, (self.a & 0b10000000) > 0);
 
         0
     }
@@ -2991,8 +2991,8 @@ impl<'a> Cpu<'a> {
         self.fetch();
         self.y = self.fetched;
 
-        self.set_flag(Flags::Z, self.y == 0);
-        self.set_flag(Flags::N, (self.y & 0b10000000) > 0);
+        self.set_flag(Flag::Z, self.y == 0);
+        self.set_flag(Flag::N, (self.y & 0b10000000) > 0);
 
         1
     }
@@ -3001,8 +3001,8 @@ impl<'a> Cpu<'a> {
         self.fetch();
         self.a = self.fetched;
 
-        self.set_flag(Flags::Z, self.a == 0);
-        self.set_flag(Flags::N, (self.a & 0b10000000) > 0);
+        self.set_flag(Flag::Z, self.a == 0);
+        self.set_flag(Flag::N, (self.a & 0b10000000) > 0);
 
         1
     }
@@ -3011,8 +3011,8 @@ impl<'a> Cpu<'a> {
         self.fetch();
         self.x = self.fetched;
 
-        self.set_flag(Flags::Z, self.x == 0);
-        self.set_flag(Flags::N, (self.x & 0b10000000) > 0);
+        self.set_flag(Flag::Z, self.x == 0);
+        self.set_flag(Flag::N, (self.x & 0b10000000) > 0);
 
         1
     }
@@ -3020,8 +3020,8 @@ impl<'a> Cpu<'a> {
     fn tay(&mut self) -> usize {
         self.y = self.a;
 
-        self.set_flag(Flags::Z, self.y == 0);
-        self.set_flag(Flags::N, (self.y & 0b10000000) > 0);
+        self.set_flag(Flag::Z, self.y == 0);
+        self.set_flag(Flag::N, (self.y & 0b10000000) > 0);
 
         0
     }
@@ -3029,20 +3029,20 @@ impl<'a> Cpu<'a> {
     fn tax(&mut self) -> usize {
         self.x = self.a;
 
-        self.set_flag(Flags::Z, self.x == 0);
-        self.set_flag(Flags::N, (self.x & 0b10000000) > 0);
+        self.set_flag(Flag::Z, self.x == 0);
+        self.set_flag(Flag::N, (self.x & 0b10000000) > 0);
 
         0
     }
 
     fn bcs(&mut self) -> usize {
-        self.conditional_branch(Flags::C, true);
+        self.conditional_branch(Flag::C, true);
 
         0
     }
 
     fn clv(&mut self) -> usize {
-        self.set_flag(Flags::V, false);
+        self.set_flag(Flag::V, false);
 
         0
     }
@@ -3050,8 +3050,8 @@ impl<'a> Cpu<'a> {
     fn tsx(&mut self) -> usize {
         self.x = self.sp;
 
-        self.set_flag(Flags::Z, self.x == 0);
-        self.set_flag(Flags::N, (self.x & 0b10000000) > 0);
+        self.set_flag(Flag::Z, self.x == 0);
+        self.set_flag(Flag::N, (self.x & 0b10000000) > 0);
 
         0
     }
@@ -3059,10 +3059,10 @@ impl<'a> Cpu<'a> {
     fn cpy(&mut self) -> usize {
         self.fetch();
 
-        self.set_flag(Flags::C, self.y >= self.fetched);
-        self.set_flag(Flags::Z, self.y == self.fetched);
+        self.set_flag(Flag::C, self.y >= self.fetched);
+        self.set_flag(Flag::Z, self.y == self.fetched);
         self.set_flag(
-            Flags::N,
+            Flag::N,
             (self.y.wrapping_sub(self.fetched) & 0b10000000) > 0,
         );
 
@@ -3072,10 +3072,10 @@ impl<'a> Cpu<'a> {
     fn cmp(&mut self) -> usize {
         self.fetch();
 
-        self.set_flag(Flags::C, self.a >= self.fetched);
-        self.set_flag(Flags::Z, self.a == self.fetched);
+        self.set_flag(Flag::C, self.a >= self.fetched);
+        self.set_flag(Flag::Z, self.a == self.fetched);
         self.set_flag(
-            Flags::N,
+            Flag::N,
             (self.a.wrapping_sub(self.fetched) & 0b10000000) > 0,
         );
 
@@ -3088,8 +3088,8 @@ impl<'a> Cpu<'a> {
         let value = self.fetched.wrapping_sub(1);
         self.bus.write(self.addr_abs, value);
 
-        self.set_flag(Flags::Z, value == 0);
-        self.set_flag(Flags::N, (value & 0b10000000) > 0);
+        self.set_flag(Flag::Z, value == 0);
+        self.set_flag(Flag::N, (value & 0b10000000) > 0);
 
         0
     }
@@ -3097,8 +3097,8 @@ impl<'a> Cpu<'a> {
     fn iny(&mut self) -> usize {
         self.y = self.y.wrapping_add(1);
 
-        self.set_flag(Flags::Z, self.y == 0);
-        self.set_flag(Flags::N, (self.y & 0b10000000) > 0);
+        self.set_flag(Flag::Z, self.y == 0);
+        self.set_flag(Flag::N, (self.y & 0b10000000) > 0);
 
         0
     }
@@ -3106,20 +3106,20 @@ impl<'a> Cpu<'a> {
     fn dex(&mut self) -> usize {
         self.x = self.x.wrapping_sub(1);
 
-        self.set_flag(Flags::Z, self.x == 0);
-        self.set_flag(Flags::N, (self.x & 0b10000000) > 0);
+        self.set_flag(Flag::Z, self.x == 0);
+        self.set_flag(Flag::N, (self.x & 0b10000000) > 0);
 
         0
     }
 
     fn bne(&mut self) -> usize {
-        self.conditional_branch(Flags::Z, false);
+        self.conditional_branch(Flag::Z, false);
 
         0
     }
 
     fn cld(&mut self) -> usize {
-        self.set_flag(Flags::D, false);
+        self.set_flag(Flag::D, false);
 
         0
     }
@@ -3131,10 +3131,10 @@ impl<'a> Cpu<'a> {
     fn cpx(&mut self) -> usize {
         self.fetch();
 
-        self.set_flag(Flags::C, self.x >= self.fetched);
-        self.set_flag(Flags::Z, self.x == self.fetched);
+        self.set_flag(Flag::C, self.x >= self.fetched);
+        self.set_flag(Flag::Z, self.x == self.fetched);
         self.set_flag(
-            Flags::N,
+            Flag::N,
             (self.x.wrapping_sub(self.fetched) & 0b10000000) > 0,
         );
 
@@ -3145,17 +3145,17 @@ impl<'a> Cpu<'a> {
         self.fetch();
         self.fetched = !self.fetched;
 
-        let result: u16 = self.a as u16 + self.fetched as u16 + self.get_flag(Flags::C) as u16;
+        let result: u16 = self.a as u16 + self.fetched as u16 + self.get_flag(Flag::C) as u16;
         let overflow =
             (!((self.a as u16) ^ (self.fetched as u16))) & ((self.a as u16) ^ result) & 0x80;
 
-        self.set_flag(Flags::C, result > 0xFF);
-        self.set_flag(Flags::V, overflow > 0);
+        self.set_flag(Flag::C, result > 0xFF);
+        self.set_flag(Flag::V, overflow > 0);
 
         self.a = result as u8;
 
-        self.set_flag(Flags::Z, self.a == 0);
-        self.set_flag(Flags::N, self.a & 0b10000000 > 0);
+        self.set_flag(Flag::Z, self.a == 0);
+        self.set_flag(Flag::N, self.a & 0b10000000 > 0);
 
         1
     }
@@ -3166,8 +3166,8 @@ impl<'a> Cpu<'a> {
         let value: u8 = self.fetched.wrapping_add(1);
         self.bus.write(self.addr_abs, value);
 
-        self.set_flag(Flags::N, (value & 0b10000000) > 0);
-        self.set_flag(Flags::Z, value == 0);
+        self.set_flag(Flag::N, (value & 0b10000000) > 0);
+        self.set_flag(Flag::Z, value == 0);
 
         0
     }
@@ -3175,20 +3175,20 @@ impl<'a> Cpu<'a> {
     fn inx(&mut self) -> usize {
         self.x = self.x.wrapping_add(1);
 
-        self.set_flag(Flags::N, (self.x & 0b10000000) > 0);
-        self.set_flag(Flags::Z, self.x == 0);
+        self.set_flag(Flag::N, (self.x & 0b10000000) > 0);
+        self.set_flag(Flag::Z, self.x == 0);
 
         1
     }
 
     fn beq(&mut self) -> usize {
-        self.conditional_branch(Flags::Z, true);
+        self.conditional_branch(Flag::Z, true);
 
         0
     }
 
     fn sed(&mut self) -> usize {
-        self.set_flag(Flags::D, true);
+        self.set_flag(Flag::D, true);
 
         0
     }
@@ -3260,7 +3260,7 @@ impl<'a> Cpu<'a> {
 
     fn anc(&mut self) -> usize {
         self.and();
-        self.set_flag(Flags::C, (self.a & 0b10000000) > 0);
+        self.set_flag(Flag::C, (self.a & 0b10000000) > 0);
 
         1
     }
@@ -3268,11 +3268,11 @@ impl<'a> Cpu<'a> {
     fn alr(&mut self) -> usize {
         self.and();
 
-        self.set_flag(Flags::C, (self.a & 0x0001) > 0);
+        self.set_flag(Flag::C, (self.a & 0x0001) > 0);
         self.a = self.a.wrapping_shr(1);
 
-        self.set_flag(Flags::Z, self.a == 0);
-        self.set_flag(Flags::N, (self.a & 0b10000000) > 1);
+        self.set_flag(Flag::Z, self.a == 0);
+        self.set_flag(Flag::N, (self.a & 0b10000000) > 1);
 
         1
     }
@@ -3283,15 +3283,15 @@ impl<'a> Cpu<'a> {
 
         let t = self.a.wrapping_shr(7);
         self.a = self.a.wrapping_shr(1);
-        self.a |= (self.get_flag(Flags::C) as u8).wrapping_shl(7);
+        self.a |= (self.get_flag(Flag::C) as u8).wrapping_shl(7);
 
-        self.set_flag(Flags::C, t & 0x01 == 0x01);
-        self.set_flag(Flags::Z, self.a == 0);
-        self.set_flag(Flags::N, (self.a & 0b10000000) > 1);
+        self.set_flag(Flag::C, t & 0x01 == 0x01);
+        self.set_flag(Flag::Z, self.a == 0);
+        self.set_flag(Flag::N, (self.a & 0b10000000) > 1);
 
         let bit_6 = (self.a >> 6) & 1;
         let bit_5 = (self.a >> 5) & 1;
-        self.set_flag(Flags::V, bit_6 ^ bit_5 == 1);
+        self.set_flag(Flag::V, bit_6 ^ bit_5 == 1);
 
         0
     }
@@ -3303,8 +3303,8 @@ impl<'a> Cpu<'a> {
         self.fetch();
         self.a = (self.a | 0xEE) & self.x & self.fetched;
 
-        self.set_flag(Flags::N, (self.a & 0b10000000) > 0);
-        self.set_flag(Flags::Z, self.a == 0);
+        self.set_flag(Flag::N, (self.a & 0b10000000) > 0);
+        self.set_flag(Flag::Z, self.a == 0);
 
         0
     }
@@ -3314,9 +3314,9 @@ impl<'a> Cpu<'a> {
 
         let res = (self.a & self.x).wrapping_sub(self.fetched);
 
-        self.set_flag(Flags::C, (self.a & self.x) >= res);
-        self.set_flag(Flags::Z, res == 0);
-        self.set_flag(Flags::N, (res & 0b10000000) > 1);
+        self.set_flag(Flag::C, (self.a & self.x) >= res);
+        self.set_flag(Flag::Z, res == 0);
+        self.set_flag(Flag::N, (res & 0b10000000) > 1);
 
         self.x = res;
 
@@ -3371,8 +3371,8 @@ impl<'a> Cpu<'a> {
         self.a = res;
         self.x = res;
 
-        self.set_flag(Flags::Z, res == 0);
-        self.set_flag(Flags::N, (res & 0b10000000) > 0);
+        self.set_flag(Flag::Z, res == 0);
+        self.set_flag(Flag::N, (res & 0b10000000) > 0);
 
         0
     }
@@ -3385,8 +3385,8 @@ impl<'a> Cpu<'a> {
         self.x = res;
         self.sp = res;
 
-        self.set_flag(Flags::Z, res == 0);
-        self.set_flag(Flags::N, (res & 0b10000000) > 0);
+        self.set_flag(Flag::Z, res == 0);
+        self.set_flag(Flag::N, (res & 0b10000000) > 0);
 
         0
     }
