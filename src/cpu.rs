@@ -67,7 +67,7 @@ impl<'a> Cpu<'a> {
                     },
                 ),
                 (
-                    0x1,
+                    0x01,
                     Instruction {
                         name: "ora",
                         operation: Cpu::ora,
@@ -76,7 +76,34 @@ impl<'a> Cpu<'a> {
                     },
                 ),
                 (
-                    0x5,
+                    0x02,
+                    Instruction {
+                        name: "kil",
+                        operation: Cpu::kil,
+                        addressmode: Cpu::imp,
+                        cycles: 1,
+                    },
+                ),
+                (
+                    0x03,
+                    Instruction {
+                        name: "slo",
+                        operation: Cpu::slo,
+                        addressmode: Cpu::izx,
+                        cycles: 8,
+                    },
+                ),
+                (
+                    0x04,
+                    Instruction {
+                        name: "ign d",
+                        operation: Cpu::nop,
+                        addressmode: Cpu::zp0,
+                        cycles: 3,
+                    },
+                ),
+                (
+                    0x05,
                     Instruction {
                         name: "ora",
                         operation: Cpu::ora,
@@ -85,7 +112,7 @@ impl<'a> Cpu<'a> {
                     },
                 ),
                 (
-                    0x6,
+                    0x06,
                     Instruction {
                         name: "asl",
                         operation: Cpu::asl,
@@ -94,7 +121,16 @@ impl<'a> Cpu<'a> {
                     },
                 ),
                 (
-                    0x8,
+                    0x07,
+                    Instruction {
+                        name: "slo",
+                        operation: Cpu::slo,
+                        addressmode: Cpu::zp0,
+                        cycles: 5,
+                    },
+                ),
+                (
+                    0x08,
                     Instruction {
                         name: "php",
                         operation: Cpu::php,
@@ -103,7 +139,7 @@ impl<'a> Cpu<'a> {
                     },
                 ),
                 (
-                    0x9,
+                    0x09,
                     Instruction {
                         name: "ora",
                         operation: Cpu::ora,
@@ -112,7 +148,7 @@ impl<'a> Cpu<'a> {
                     },
                 ),
                 (
-                    0xa,
+                    0x0a,
                     Instruction {
                         name: "asl",
                         operation: Cpu::asl,
@@ -121,7 +157,25 @@ impl<'a> Cpu<'a> {
                     },
                 ),
                 (
-                    0xd,
+                    0x0b,
+                    Instruction {
+                        name: "anc",
+                        operation: Cpu::anc,
+                        addressmode: Cpu::imm,
+                        cycles: 2,
+                    },
+                ),
+                (
+                    0x0c,
+                    Instruction {
+                        name: "ign a",
+                        operation: Cpu::nop,
+                        addressmode: Cpu::abs,
+                        cycles: 4,
+                    },
+                ),
+                (
+                    0x0d,
                     Instruction {
                         name: "ora",
                         operation: Cpu::ora,
@@ -130,10 +184,19 @@ impl<'a> Cpu<'a> {
                     },
                 ),
                 (
-                    0xe,
+                    0x0e,
                     Instruction {
                         name: "asl",
                         operation: Cpu::asl,
+                        addressmode: Cpu::abs,
+                        cycles: 6,
+                    },
+                ),
+                (
+                    0x0f,
+                    Instruction {
+                        name: "slo",
+                        operation: Cpu::slo,
                         addressmode: Cpu::abs,
                         cycles: 6,
                     },
@@ -157,6 +220,33 @@ impl<'a> Cpu<'a> {
                     },
                 ),
                 (
+                    0x12,
+                    Instruction {
+                        name: "kil",
+                        operation: Cpu::kil,
+                        addressmode: Cpu::imp,
+                        cycles: 1,
+                    },
+                ),
+                (
+                    0x13,
+                    Instruction {
+                        name: "slo",
+                        operation: Cpu::slo,
+                        addressmode: Cpu::izy,
+                        cycles: 8,
+                    },
+                ),
+                (
+                    0x14,
+                    Instruction {
+                        name: "ign d,X",
+                        operation: Cpu::nop,
+                        addressmode: Cpu::zpx,
+                        cycles: 4,
+                    },
+                ),
+                (
                     0x15,
                     Instruction {
                         name: "ora",
@@ -170,6 +260,15 @@ impl<'a> Cpu<'a> {
                     Instruction {
                         name: "asl",
                         operation: Cpu::asl,
+                        addressmode: Cpu::zpx,
+                        cycles: 6,
+                    },
+                ),
+                (
+                    0x17,
+                    Instruction {
+                        name: "slo",
+                        operation: Cpu::slo,
                         addressmode: Cpu::zpx,
                         cycles: 6,
                     },
@@ -193,6 +292,33 @@ impl<'a> Cpu<'a> {
                     },
                 ),
                 (
+                    0x1a,
+                    Instruction {
+                        name: "nop",
+                        operation: Cpu::nop,
+                        addressmode: Cpu::imp,
+                        cycles: 2,
+                    },
+                ),
+                (
+                    0x1b,
+                    Instruction {
+                        name: "slo",
+                        operation: Cpu::slo,
+                        addressmode: Cpu::aby,
+                        cycles: 7,
+                    },
+                ),
+                (
+                    0x1c,
+                    Instruction {
+                        name: "ign a,X",
+                        operation: Cpu::nop,
+                        addressmode: Cpu::abx,
+                        cycles: 4,
+                    },
+                ),
+                (
                     0x1d,
                     Instruction {
                         name: "ora",
@@ -206,6 +332,15 @@ impl<'a> Cpu<'a> {
                     Instruction {
                         name: "asl",
                         operation: Cpu::asl,
+                        addressmode: Cpu::abx,
+                        cycles: 7,
+                    },
+                ),
+                (
+                    0x1f,
+                    Instruction {
+                        name: "slo",
+                        operation: Cpu::slo,
                         addressmode: Cpu::abx,
                         cycles: 7,
                     },
@@ -226,6 +361,24 @@ impl<'a> Cpu<'a> {
                         operation: Cpu::and,
                         addressmode: Cpu::izx,
                         cycles: 6,
+                    },
+                ),
+                (
+                    0x22,
+                    Instruction {
+                        name: "kil",
+                        operation: Cpu::kil,
+                        addressmode: Cpu::imp,
+                        cycles: 1,
+                    },
+                ),
+                (
+                    0x23,
+                    Instruction {
+                        name: "rla",
+                        operation: Cpu::rla,
+                        addressmode: Cpu::izx,
+                        cycles: 8,
                     },
                 ),
                 (
@@ -251,6 +404,15 @@ impl<'a> Cpu<'a> {
                     Instruction {
                         name: "rol",
                         operation: Cpu::rol,
+                        addressmode: Cpu::zp0,
+                        cycles: 5,
+                    },
+                ),
+                (
+                    0x27,
+                    Instruction {
+                        name: "rla",
+                        operation: Cpu::rla,
                         addressmode: Cpu::zp0,
                         cycles: 5,
                     },
@@ -283,6 +445,15 @@ impl<'a> Cpu<'a> {
                     },
                 ),
                 (
+                    0x2b,
+                    Instruction {
+                        name: "anc",
+                        operation: Cpu::anc,
+                        addressmode: Cpu::imm,
+                        cycles: 2,
+                    },
+                ),
+                (
                     0x2c,
                     Instruction {
                         name: "bit",
@@ -310,6 +481,15 @@ impl<'a> Cpu<'a> {
                     },
                 ),
                 (
+                    0x2f,
+                    Instruction {
+                        name: "rla",
+                        operation: Cpu::rla,
+                        addressmode: Cpu::abs,
+                        cycles: 6,
+                    },
+                ),
+                (
                     0x30,
                     Instruction {
                         name: "bmi",
@@ -328,6 +508,33 @@ impl<'a> Cpu<'a> {
                     },
                 ),
                 (
+                    0x32,
+                    Instruction {
+                        name: "kil",
+                        operation: Cpu::kil,
+                        addressmode: Cpu::imp,
+                        cycles: 1,
+                    },
+                ),
+                (
+                    0x33,
+                    Instruction {
+                        name: "rla",
+                        operation: Cpu::rla,
+                        addressmode: Cpu::izy,
+                        cycles: 8,
+                    },
+                ),
+                (
+                    0x34,
+                    Instruction {
+                        name: "ign d,X",
+                        operation: Cpu::nop,
+                        addressmode: Cpu::zpx,
+                        cycles: 4,
+                    },
+                ),
+                (
                     0x35,
                     Instruction {
                         name: "and",
@@ -341,6 +548,15 @@ impl<'a> Cpu<'a> {
                     Instruction {
                         name: "rol",
                         operation: Cpu::rol,
+                        addressmode: Cpu::zpx,
+                        cycles: 6,
+                    },
+                ),
+                (
+                    0x37,
+                    Instruction {
+                        name: "rla",
+                        operation: Cpu::rla,
                         addressmode: Cpu::zpx,
                         cycles: 6,
                     },
@@ -364,6 +580,33 @@ impl<'a> Cpu<'a> {
                     },
                 ),
                 (
+                    0x3a,
+                    Instruction {
+                        name: "NOP",
+                        operation: Cpu::nop,
+                        addressmode: Cpu::imp,
+                        cycles: 2,
+                    },
+                ),
+                (
+                    0x3b,
+                    Instruction {
+                        name: "rla",
+                        operation: Cpu::rla,
+                        addressmode: Cpu::aby,
+                        cycles: 7,
+                    },
+                ),
+                (
+                    0x3c,
+                    Instruction {
+                        name: "ign a,X",
+                        operation: Cpu::nop,
+                        addressmode: Cpu::abx,
+                        cycles: 4,
+                    },
+                ),
+                (
                     0x3d,
                     Instruction {
                         name: "and",
@@ -377,6 +620,15 @@ impl<'a> Cpu<'a> {
                     Instruction {
                         name: "rol",
                         operation: Cpu::rol,
+                        addressmode: Cpu::abx,
+                        cycles: 7,
+                    },
+                ),
+                (
+                    0x3f,
+                    Instruction {
+                        name: "rla",
+                        operation: Cpu::rla,
                         addressmode: Cpu::abx,
                         cycles: 7,
                     },
@@ -400,6 +652,33 @@ impl<'a> Cpu<'a> {
                     },
                 ),
                 (
+                    0x42,
+                    Instruction {
+                        name: "kil",
+                        operation: Cpu::kil,
+                        addressmode: Cpu::imp,
+                        cycles: 1,
+                    },
+                ),
+                (
+                    0x43,
+                    Instruction {
+                        name: "sre",
+                        operation: Cpu::sre,
+                        addressmode: Cpu::izx,
+                        cycles: 8,
+                    },
+                ),
+                (
+                    0x44,
+                    Instruction {
+                        name: "ign d",
+                        operation: Cpu::nop,
+                        addressmode: Cpu::zp0,
+                        cycles: 3,
+                    },
+                ),
+                (
                     0x45,
                     Instruction {
                         name: "eor",
@@ -413,6 +692,15 @@ impl<'a> Cpu<'a> {
                     Instruction {
                         name: "lsr",
                         operation: Cpu::lsr,
+                        addressmode: Cpu::zp0,
+                        cycles: 5,
+                    },
+                ),
+                (
+                    0x47,
+                    Instruction {
+                        name: "sre",
+                        operation: Cpu::sre,
                         addressmode: Cpu::zp0,
                         cycles: 5,
                     },
@@ -445,6 +733,15 @@ impl<'a> Cpu<'a> {
                     },
                 ),
                 (
+                    0x4b,
+                    Instruction {
+                        name: "alr",
+                        operation: Cpu::alr,
+                        addressmode: Cpu::imm,
+                        cycles: 2,
+                    },
+                ),
+                (
                     0x4c,
                     Instruction {
                         name: "jmp",
@@ -472,6 +769,15 @@ impl<'a> Cpu<'a> {
                     },
                 ),
                 (
+                    0x4f,
+                    Instruction {
+                        name: "sre",
+                        operation: Cpu::sre,
+                        addressmode: Cpu::abs,
+                        cycles: 6,
+                    },
+                ),
+                (
                     0x50,
                     Instruction {
                         name: "bvc",
@@ -490,6 +796,33 @@ impl<'a> Cpu<'a> {
                     },
                 ),
                 (
+                    0x52,
+                    Instruction {
+                        name: "kil",
+                        operation: Cpu::kil,
+                        addressmode: Cpu::imp,
+                        cycles: 1,
+                    },
+                ),
+                (
+                    0x53,
+                    Instruction {
+                        name: "sre",
+                        operation: Cpu::sre,
+                        addressmode: Cpu::izy,
+                        cycles: 8,
+                    },
+                ),
+                (
+                    0x54,
+                    Instruction {
+                        name: "ign d,X",
+                        operation: Cpu::nop,
+                        addressmode: Cpu::zpx,
+                        cycles: 4,
+                    },
+                ),
+                (
                     0x55,
                     Instruction {
                         name: "eor",
@@ -503,6 +836,15 @@ impl<'a> Cpu<'a> {
                     Instruction {
                         name: "lsr",
                         operation: Cpu::lsr,
+                        addressmode: Cpu::zpx,
+                        cycles: 6,
+                    },
+                ),
+                (
+                    0x57,
+                    Instruction {
+                        name: "sre",
+                        operation: Cpu::sre,
                         addressmode: Cpu::zpx,
                         cycles: 6,
                     },
@@ -526,6 +868,24 @@ impl<'a> Cpu<'a> {
                     },
                 ),
                 (
+                    0x5b,
+                    Instruction {
+                        name: "sre",
+                        operation: Cpu::sre,
+                        addressmode: Cpu::aby,
+                        cycles: 7,
+                    },
+                ),
+                (
+                    0x5c,
+                    Instruction {
+                        name: "ign a,X",
+                        operation: Cpu::nop,
+                        addressmode: Cpu::abx,
+                        cycles: 4,
+                    },
+                ),
+                (
                     0x5d,
                     Instruction {
                         name: "eor",
@@ -535,10 +895,28 @@ impl<'a> Cpu<'a> {
                     },
                 ),
                 (
+                    0x5a,
+                    Instruction {
+                        name: "nop",
+                        operation: Cpu::nop,
+                        addressmode: Cpu::imp,
+                        cycles: 2,
+                    },
+                ),
+                (
                     0x5e,
                     Instruction {
                         name: "lsr",
                         operation: Cpu::lsr,
+                        addressmode: Cpu::abx,
+                        cycles: 7,
+                    },
+                ),
+                (
+                    0x5f,
+                    Instruction {
+                        name: "sre",
+                        operation: Cpu::sre,
                         addressmode: Cpu::abx,
                         cycles: 7,
                     },
@@ -562,6 +940,33 @@ impl<'a> Cpu<'a> {
                     },
                 ),
                 (
+                    0x62,
+                    Instruction {
+                        name: "kil",
+                        operation: Cpu::kil,
+                        addressmode: Cpu::imp,
+                        cycles: 1,
+                    },
+                ),
+                (
+                    0x63,
+                    Instruction {
+                        name: "rra",
+                        operation: Cpu::rra,
+                        addressmode: Cpu::izx,
+                        cycles: 8,
+                    },
+                ),
+                (
+                    0x64,
+                    Instruction {
+                        name: "ign d",
+                        operation: Cpu::nop,
+                        addressmode: Cpu::zp0,
+                        cycles: 3,
+                    },
+                ),
+                (
                     0x65,
                     Instruction {
                         name: "adc",
@@ -575,6 +980,15 @@ impl<'a> Cpu<'a> {
                     Instruction {
                         name: "ror",
                         operation: Cpu::ror,
+                        addressmode: Cpu::zp0,
+                        cycles: 5,
+                    },
+                ),
+                (
+                    0x67,
+                    Instruction {
+                        name: "rra",
+                        operation: Cpu::rra,
                         addressmode: Cpu::zp0,
                         cycles: 5,
                     },
@@ -607,6 +1021,15 @@ impl<'a> Cpu<'a> {
                     },
                 ),
                 (
+                    0x6b,
+                    Instruction {
+                        name: "arr",
+                        operation: Cpu::arr,
+                        addressmode: Cpu::imm,
+                        cycles: 2,
+                    },
+                ),
+                (
                     0x6c,
                     Instruction {
                         name: "jmp",
@@ -634,6 +1057,15 @@ impl<'a> Cpu<'a> {
                     },
                 ),
                 (
+                    0x6f,
+                    Instruction {
+                        name: "rra",
+                        operation: Cpu::rra,
+                        addressmode: Cpu::abs,
+                        cycles: 6,
+                    },
+                ),
+                (
                     0x70,
                     Instruction {
                         name: "bvs",
@@ -652,6 +1084,33 @@ impl<'a> Cpu<'a> {
                     },
                 ),
                 (
+                    0x72,
+                    Instruction {
+                        name: "kil",
+                        operation: Cpu::kil,
+                        addressmode: Cpu::imp,
+                        cycles: 1,
+                    },
+                ),
+                (
+                    0x73,
+                    Instruction {
+                        name: "rra",
+                        operation: Cpu::rra,
+                        addressmode: Cpu::izy,
+                        cycles: 8,
+                    },
+                ),
+                (
+                    0x74,
+                    Instruction {
+                        name: "ign d,X",
+                        operation: Cpu::nop,
+                        addressmode: Cpu::zpx,
+                        cycles: 4,
+                    },
+                ),
+                (
                     0x75,
                     Instruction {
                         name: "adc",
@@ -665,6 +1124,15 @@ impl<'a> Cpu<'a> {
                     Instruction {
                         name: "ror",
                         operation: Cpu::ror,
+                        addressmode: Cpu::zpx,
+                        cycles: 6,
+                    },
+                ),
+                (
+                    0x77,
+                    Instruction {
+                        name: "rra",
+                        operation: Cpu::rra,
                         addressmode: Cpu::zpx,
                         cycles: 6,
                     },
@@ -688,6 +1156,33 @@ impl<'a> Cpu<'a> {
                     },
                 ),
                 (
+                    0x7a,
+                    Instruction {
+                        name: "nop",
+                        operation: Cpu::nop,
+                        addressmode: Cpu::imp,
+                        cycles: 2,
+                    },
+                ),
+                (
+                    0x7b,
+                    Instruction {
+                        name: "rra",
+                        operation: Cpu::rra,
+                        addressmode: Cpu::aby,
+                        cycles: 7,
+                    },
+                ),
+                (
+                    0x7c,
+                    Instruction {
+                        name: "ign a,X",
+                        operation: Cpu::nop,
+                        addressmode: Cpu::abx,
+                        cycles: 4,
+                    },
+                ),
+                (
                     0x7d,
                     Instruction {
                         name: "adc",
@@ -706,10 +1201,46 @@ impl<'a> Cpu<'a> {
                     },
                 ),
                 (
+                    0x7f,
+                    Instruction {
+                        name: "rra",
+                        operation: Cpu::rra,
+                        addressmode: Cpu::abx,
+                        cycles: 7,
+                    },
+                ),
+                (
+                    0x80,
+                    Instruction {
+                        name: "skb #i",
+                        operation: Cpu::nop,
+                        addressmode: Cpu::imm,
+                        cycles: 2,
+                    },
+                ),
+                (
                     0x81,
                     Instruction {
                         name: "sta",
                         operation: Cpu::sta,
+                        addressmode: Cpu::izx,
+                        cycles: 6,
+                    },
+                ),
+                (
+                    0x82,
+                    Instruction {
+                        name: "skb #i",
+                        operation: Cpu::nop,
+                        addressmode: Cpu::imm,
+                        cycles: 2,
+                    },
+                ),
+                (
+                    0x83,
+                    Instruction {
+                        name: "sax",
+                        operation: Cpu::sax,
                         addressmode: Cpu::izx,
                         cycles: 6,
                     },
@@ -751,11 +1282,38 @@ impl<'a> Cpu<'a> {
                     },
                 ),
                 (
+                    0x87,
+                    Instruction {
+                        name: "sax",
+                        operation: Cpu::sax,
+                        addressmode: Cpu::zp0,
+                        cycles: 3,
+                    },
+                ),
+                (
+                    0x89,
+                    Instruction {
+                        name: "skb #i",
+                        operation: Cpu::nop,
+                        addressmode: Cpu::imm,
+                        cycles: 2,
+                    },
+                ),
+                (
                     0x8a,
                     Instruction {
                         name: "txa",
                         operation: Cpu::txa,
                         addressmode: Cpu::imp,
+                        cycles: 2,
+                    },
+                ),
+                (
+                    0x8b,
+                    Instruction {
+                        name: "xaa",
+                        operation: Cpu::xaa,
+                        addressmode: Cpu::imm,
                         cycles: 2,
                     },
                 ),
@@ -787,6 +1345,15 @@ impl<'a> Cpu<'a> {
                     },
                 ),
                 (
+                    0x8f,
+                    Instruction {
+                        name: "sax",
+                        operation: Cpu::sax,
+                        addressmode: Cpu::abs,
+                        cycles: 4,
+                    },
+                ),
+                (
                     0x90,
                     Instruction {
                         name: "bcc",
@@ -800,6 +1367,24 @@ impl<'a> Cpu<'a> {
                     Instruction {
                         name: "sta",
                         operation: Cpu::sta,
+                        addressmode: Cpu::izy,
+                        cycles: 6,
+                    },
+                ),
+                (
+                    0x92,
+                    Instruction {
+                        name: "kil",
+                        operation: Cpu::kil,
+                        addressmode: Cpu::imp,
+                        cycles: 1,
+                    },
+                ),
+                (
+                    0x93,
+                    Instruction {
+                        name: "ahx",
+                        operation: Cpu::sha,
                         addressmode: Cpu::izy,
                         cycles: 6,
                     },
@@ -832,12 +1417,30 @@ impl<'a> Cpu<'a> {
                     },
                 ),
                 (
+                    0x97,
+                    Instruction {
+                        name: "sax",
+                        operation: Cpu::sax,
+                        addressmode: Cpu::zpy,
+                        cycles: 4,
+                    },
+                ),
+                (
                     0x98,
                     Instruction {
                         name: "tya",
                         operation: Cpu::tya,
                         addressmode: Cpu::imp,
                         cycles: 2,
+                    },
+                ),
+                (
+                    0x9F,
+                    Instruction {
+                        name: "sha",
+                        operation: Cpu::sha,
+                        addressmode: Cpu::aby,
+                        cycles: 5,
                     },
                 ),
                 (
@@ -859,11 +1462,38 @@ impl<'a> Cpu<'a> {
                     },
                 ),
                 (
+                    0x9b,
+                    Instruction {
+                        name: "tas",
+                        operation: Cpu::tas,
+                        addressmode: Cpu::aby,
+                        cycles: 5,
+                    },
+                ),
+                (
+                    0x9c,
+                    Instruction {
+                        name: "shy",
+                        operation: Cpu::shy,
+                        addressmode: Cpu::abx,
+                        cycles: 5,
+                    },
+                ),
+                (
                     0x9d,
                     Instruction {
                         name: "sta",
                         operation: Cpu::sta,
                         addressmode: Cpu::abx,
+                        cycles: 5,
+                    },
+                ),
+                (
+                    0x9e,
+                    Instruction {
+                        name: "shx",
+                        operation: Cpu::shx,
+                        addressmode: Cpu::aby,
                         cycles: 5,
                     },
                 ),
@@ -895,6 +1525,15 @@ impl<'a> Cpu<'a> {
                     },
                 ),
                 (
+                    0xa3,
+                    Instruction {
+                        name: "lax",
+                        operation: Cpu::lax,
+                        addressmode: Cpu::izx,
+                        cycles: 6,
+                    },
+                ),
+                (
                     0xa4,
                     Instruction {
                         name: "ldy",
@@ -917,6 +1556,15 @@ impl<'a> Cpu<'a> {
                     Instruction {
                         name: "ldx",
                         operation: Cpu::ldx,
+                        addressmode: Cpu::zp0,
+                        cycles: 3,
+                    },
+                ),
+                (
+                    0xa7,
+                    Instruction {
+                        name: "lax",
+                        operation: Cpu::lax,
                         addressmode: Cpu::zp0,
                         cycles: 3,
                     },
@@ -949,6 +1597,15 @@ impl<'a> Cpu<'a> {
                     },
                 ),
                 (
+                    0xab,
+                    Instruction {
+                        name: "lxa",
+                        operation: Cpu::lxa,
+                        addressmode: Cpu::imm,
+                        cycles: 2,
+                    },
+                ),
+                (
                     0xac,
                     Instruction {
                         name: "ldy",
@@ -976,6 +1633,15 @@ impl<'a> Cpu<'a> {
                     },
                 ),
                 (
+                    0xaf,
+                    Instruction {
+                        name: "lax",
+                        operation: Cpu::lax,
+                        addressmode: Cpu::abs,
+                        cycles: 4,
+                    },
+                ),
+                (
                     0xb0,
                     Instruction {
                         name: "bcs",
@@ -989,6 +1655,24 @@ impl<'a> Cpu<'a> {
                     Instruction {
                         name: "lda",
                         operation: Cpu::lda,
+                        addressmode: Cpu::izy,
+                        cycles: 5,
+                    },
+                ),
+                (
+                    0xb2,
+                    Instruction {
+                        name: "kil",
+                        operation: Cpu::kil,
+                        addressmode: Cpu::imp,
+                        cycles: 1,
+                    },
+                ),
+                (
+                    0xb3,
+                    Instruction {
+                        name: "lax",
+                        operation: Cpu::lax,
                         addressmode: Cpu::izy,
                         cycles: 5,
                     },
@@ -1021,6 +1705,15 @@ impl<'a> Cpu<'a> {
                     },
                 ),
                 (
+                    0xb7,
+                    Instruction {
+                        name: "lax",
+                        operation: Cpu::lax,
+                        addressmode: Cpu::zpy,
+                        cycles: 4,
+                    },
+                ),
+                (
                     0xb8,
                     Instruction {
                         name: "clv",
@@ -1045,6 +1738,15 @@ impl<'a> Cpu<'a> {
                         operation: Cpu::tsx,
                         addressmode: Cpu::imp,
                         cycles: 2,
+                    },
+                ),
+                (
+                    0xbb,
+                    Instruction {
+                        name: "las",
+                        operation: Cpu::las,
+                        addressmode: Cpu::aby,
+                        cycles: 4,
                     },
                 ),
                 (
@@ -1075,6 +1777,15 @@ impl<'a> Cpu<'a> {
                     },
                 ),
                 (
+                    0xbf,
+                    Instruction {
+                        name: "lax",
+                        operation: Cpu::lax,
+                        addressmode: Cpu::aby,
+                        cycles: 4,
+                    },
+                ),
+                (
                     0xc0,
                     Instruction {
                         name: "cpy",
@@ -1090,6 +1801,24 @@ impl<'a> Cpu<'a> {
                         operation: Cpu::cmp,
                         addressmode: Cpu::izx,
                         cycles: 6,
+                    },
+                ),
+                (
+                    0xc2,
+                    Instruction {
+                        name: "skb #i",
+                        operation: Cpu::nop,
+                        addressmode: Cpu::imm,
+                        cycles: 2,
+                    },
+                ),
+                (
+                    0xc3,
+                    Instruction {
+                        name: "dcp",
+                        operation: Cpu::dcp,
+                        addressmode: Cpu::izx,
+                        cycles: 8,
                     },
                 ),
                 (
@@ -1115,6 +1844,15 @@ impl<'a> Cpu<'a> {
                     Instruction {
                         name: "dec",
                         operation: Cpu::dec,
+                        addressmode: Cpu::zp0,
+                        cycles: 5,
+                    },
+                ),
+                (
+                    0xc7,
+                    Instruction {
+                        name: "dcp",
+                        operation: Cpu::dcp,
                         addressmode: Cpu::zp0,
                         cycles: 5,
                     },
@@ -1147,6 +1885,15 @@ impl<'a> Cpu<'a> {
                     },
                 ),
                 (
+                    0xcb,
+                    Instruction {
+                        name: "axs",
+                        operation: Cpu::axs,
+                        addressmode: Cpu::imm,
+                        cycles: 2,
+                    },
+                ),
+                (
                     0xcc,
                     Instruction {
                         name: "cpy",
@@ -1174,6 +1921,15 @@ impl<'a> Cpu<'a> {
                     },
                 ),
                 (
+                    0xcf,
+                    Instruction {
+                        name: "dcp",
+                        operation: Cpu::dcp,
+                        addressmode: Cpu::abs,
+                        cycles: 6,
+                    },
+                ),
+                (
                     0xd0,
                     Instruction {
                         name: "bne",
@@ -1192,6 +1948,33 @@ impl<'a> Cpu<'a> {
                     },
                 ),
                 (
+                    0xd2,
+                    Instruction {
+                        name: "kil",
+                        operation: Cpu::kil,
+                        addressmode: Cpu::imp,
+                        cycles: 1,
+                    },
+                ),
+                (
+                    0xd3,
+                    Instruction {
+                        name: "dcp",
+                        operation: Cpu::dcp,
+                        addressmode: Cpu::izy,
+                        cycles: 8,
+                    },
+                ),
+                (
+                    0xd4,
+                    Instruction {
+                        name: "ign d,X",
+                        operation: Cpu::nop,
+                        addressmode: Cpu::zpx,
+                        cycles: 4,
+                    },
+                ),
+                (
                     0xd5,
                     Instruction {
                         name: "cmp",
@@ -1205,6 +1988,15 @@ impl<'a> Cpu<'a> {
                     Instruction {
                         name: "dec",
                         operation: Cpu::dec,
+                        addressmode: Cpu::zpx,
+                        cycles: 6,
+                    },
+                ),
+                (
+                    0xd7,
+                    Instruction {
+                        name: "dcp",
+                        operation: Cpu::dcp,
                         addressmode: Cpu::zpx,
                         cycles: 6,
                     },
@@ -1237,6 +2029,24 @@ impl<'a> Cpu<'a> {
                     },
                 ),
                 (
+                    0xdb,
+                    Instruction {
+                        name: "dcp",
+                        operation: Cpu::dcp,
+                        addressmode: Cpu::aby,
+                        cycles: 7,
+                    },
+                ),
+                (
+                    0xdc,
+                    Instruction {
+                        name: "ign a,X",
+                        operation: Cpu::nop,
+                        addressmode: Cpu::abx,
+                        cycles: 4,
+                    },
+                ),
+                (
                     0xdd,
                     Instruction {
                         name: "cmp",
@@ -1250,6 +2060,15 @@ impl<'a> Cpu<'a> {
                     Instruction {
                         name: "dec",
                         operation: Cpu::dec,
+                        addressmode: Cpu::abx,
+                        cycles: 7,
+                    },
+                ),
+                (
+                    0xdf,
+                    Instruction {
+                        name: "dcp",
+                        operation: Cpu::dcp,
                         addressmode: Cpu::abx,
                         cycles: 7,
                     },
@@ -1270,6 +2089,24 @@ impl<'a> Cpu<'a> {
                         operation: Cpu::sbc,
                         addressmode: Cpu::izx,
                         cycles: 6,
+                    },
+                ),
+                (
+                    0xe2,
+                    Instruction {
+                        name: "skb #i",
+                        operation: Cpu::nop,
+                        addressmode: Cpu::imm,
+                        cycles: 2,
+                    },
+                ),
+                (
+                    0xe3,
+                    Instruction {
+                        name: "isc",
+                        operation: Cpu::isc,
+                        addressmode: Cpu::izx,
+                        cycles: 8,
                     },
                 ),
                 (
@@ -1295,6 +2132,15 @@ impl<'a> Cpu<'a> {
                     Instruction {
                         name: "inc",
                         operation: Cpu::inc,
+                        addressmode: Cpu::zp0,
+                        cycles: 5,
+                    },
+                ),
+                (
+                    0xe7,
+                    Instruction {
+                        name: "isc",
+                        operation: Cpu::isc,
                         addressmode: Cpu::zp0,
                         cycles: 5,
                     },
@@ -1327,6 +2173,15 @@ impl<'a> Cpu<'a> {
                     },
                 ),
                 (
+                    0xeb,
+                    Instruction {
+                        name: "nop",
+                        operation: Cpu::sbc,
+                        addressmode: Cpu::imm,
+                        cycles: 2,
+                    },
+                ),
+                (
                     0xec,
                     Instruction {
                         name: "cpx",
@@ -1354,6 +2209,15 @@ impl<'a> Cpu<'a> {
                     },
                 ),
                 (
+                    0xef,
+                    Instruction {
+                        name: "isc",
+                        operation: Cpu::isc,
+                        addressmode: Cpu::abs,
+                        cycles: 6,
+                    },
+                ),
+                (
                     0xf0,
                     Instruction {
                         name: "beq",
@@ -1372,6 +2236,33 @@ impl<'a> Cpu<'a> {
                     },
                 ),
                 (
+                    0xf2,
+                    Instruction {
+                        name: "kil",
+                        operation: Cpu::kil,
+                        addressmode: Cpu::imp,
+                        cycles: 1,
+                    },
+                ),
+                (
+                    0xf3,
+                    Instruction {
+                        name: "isc",
+                        operation: Cpu::isc,
+                        addressmode: Cpu::izy,
+                        cycles: 8,
+                    },
+                ),
+                (
+                    0xf4,
+                    Instruction {
+                        name: "ign d,X",
+                        operation: Cpu::nop,
+                        addressmode: Cpu::zpx,
+                        cycles: 4,
+                    },
+                ),
+                (
                     0xf5,
                     Instruction {
                         name: "sbc",
@@ -1385,6 +2276,15 @@ impl<'a> Cpu<'a> {
                     Instruction {
                         name: "inc",
                         operation: Cpu::inc,
+                        addressmode: Cpu::zpx,
+                        cycles: 6,
+                    },
+                ),
+                (
+                    0xf7,
+                    Instruction {
+                        name: "isc",
+                        operation: Cpu::isc,
                         addressmode: Cpu::zpx,
                         cycles: 6,
                     },
@@ -1417,6 +2317,24 @@ impl<'a> Cpu<'a> {
                     },
                 ),
                 (
+                    0xfb,
+                    Instruction {
+                        name: "isc",
+                        operation: Cpu::isc,
+                        addressmode: Cpu::aby,
+                        cycles: 7,
+                    },
+                ),
+                (
+                    0xfc,
+                    Instruction {
+                        name: "ign a,X",
+                        operation: Cpu::nop,
+                        addressmode: Cpu::abx,
+                        cycles: 4,
+                    },
+                ),
+                (
                     0xfd,
                     Instruction {
                         name: "sbc",
@@ -1430,6 +2348,15 @@ impl<'a> Cpu<'a> {
                     Instruction {
                         name: "inc",
                         operation: Cpu::inc,
+                        addressmode: Cpu::abx,
+                        cycles: 7,
+                    },
+                ),
+                (
+                    0xff,
+                    Instruction {
+                        name: "isc",
+                        operation: Cpu::isc,
                         addressmode: Cpu::abx,
                         cycles: 7,
                     },
@@ -1449,27 +2376,6 @@ impl<'a> Cpu<'a> {
         self.status & (flag as u8) != 0
     }
 
-    pub fn step(&mut self) {
-        self.opcode = self.bus.read(self.pc);
-        self.pc = self.pc.overflowing_add(1).0;
-        println!("{:X}", self.opcode);
-        let ins = self
-            .dispatch
-            .get(&self.opcode)
-            .copied()
-            .expect("opcode should be in dispatch table");
-        self.cycles = ins.cycles;
-        println!(
-            "{}; 002={:X}; 003={:X};",
-            ins.name,
-            self.bus.read(0x0002u16),
-            self.bus.read(0x0003u16)
-        );
-        let a = (ins.addressmode)(self);
-        let b = (ins.operation)(self);
-
-        self.cycles += a & b;
-    }
     pub fn clock(&mut self) {
         if self.cycles == 0 {
             self.opcode = self.bus.read(self.pc);
@@ -1484,11 +2390,9 @@ impl<'a> Cpu<'a> {
                 .expect("opcode should be in dispatch table");
             self.cycles = instruction.cycles;
 
-            println!("{:X} {:X}", self.pc, self.opcode);
-
             let addr_cycles = (instruction.addressmode)(self);
             let op_cycles = (instruction.operation)(self);
-            println!("PC: {:x}", self.pc);
+
             self.cycles += addr_cycles & op_cycles;
 
             self.set_flag(Flags::U, true);
@@ -2292,6 +3196,204 @@ impl<'a> Cpu<'a> {
 
         0
     }
+
+    // Illegal opcodes
+
+    fn lax(&mut self) -> usize {
+        self.lda();
+        self.tax();
+
+        1
+    }
+
+    fn sax(&mut self) -> usize {
+        self.bus.write(self.addr_abs, self.a & self.x);
+
+        0
+    }
+
+    fn dcp(&mut self) -> usize {
+        self.dec();
+        self.cmp();
+
+        0
+    }
+
+    fn isc(&mut self) -> usize {
+        self.inc();
+        self.sbc();
+
+        1
+    }
+
+    fn slo(&mut self) -> usize {
+        self.asl();
+        self.ora();
+
+        0
+    }
+
+    fn rla(&mut self) -> usize {
+        self.rol();
+        self.and();
+
+        1
+    }
+
+    fn sre(&mut self) -> usize {
+        self.lsr();
+        self.eor();
+
+        0
+    }
+
+    fn rra(&mut self) -> usize {
+        self.ror();
+        self.adc();
+
+        1
+    }
+
+    // Halts the cpu which doesn't increase the program counter.
+    // Remove 1 from the pc to mimic this behavior.
+    fn kil(&mut self) -> usize {
+        self.pc = self.pc.wrapping_sub(1);
+
+        0
+    }
+
+    fn anc(&mut self) -> usize {
+        self.and();
+        self.set_flag(Flags::C, (self.a & 0b10000000) > 0);
+
+        1
+    }
+
+    fn alr(&mut self) -> usize {
+        self.and();
+
+        self.set_flag(Flags::C, (self.a & 0x0001) > 0);
+        self.a = self.a.overflowing_shr(1).0;
+
+        self.set_flag(Flags::Z, self.a == 0);
+        self.set_flag(Flags::N, (self.a & 0b10000000) > 1);
+
+        1
+    }
+
+    fn arr(&mut self) -> usize {
+        self.fetch();
+        self.a &= self.fetched;
+
+        let t = self.a.wrapping_shr(7);
+        self.a = self.a.wrapping_shr(1);
+        self.a |= (self.get_flag(Flags::C) as u8).wrapping_shl(7);
+
+        self.set_flag(Flags::C, t & 0x01 == 0x01);
+        self.set_flag(Flags::Z, self.a == 0);
+        self.set_flag(Flags::N, (self.a & 0b10000000) > 1);
+
+        let bit_6 = (self.a >> 6) & 1;
+        let bit_5 = (self.a >> 5) & 1;
+        self.set_flag(Flags::V, bit_6 ^ bit_5 == 1);
+
+        0
+    }
+
+    // Unstable operation; 0xEE could be 0xFF, 0x00, etc.
+    // depending on the specific chip or even environmental
+    // conditions.
+    fn xaa(&mut self) -> usize {
+        self.fetch();
+        self.a = (self.a | 0xEE) & self.x & self.fetched;
+
+        self.set_flag(Flags::N, (self.a & 0b10000000) > 0);
+        self.set_flag(Flags::Z, self.a == 0);
+
+        0
+    }
+
+    fn axs(&mut self) -> usize {
+        self.fetch();
+
+        let res = (self.a & self.x).overflowing_sub(self.fetched).0;
+
+        self.set_flag(Flags::C, (self.a & self.x) >= res);
+        self.set_flag(Flags::Z, res == 0);
+        self.set_flag(Flags::N, (res & 0b10000000) > 1);
+
+        self.x = res as u8;
+
+        0
+    }
+
+    fn tas(&mut self) -> usize {
+        self.fetch();
+        self.sp = self.a & self.x;
+        self.bus.write(
+            self.addr_abs,
+            self.a & self.x & ((self.addr_abs.wrapping_shr(8) as u8).wrapping_add(1)),
+        );
+
+        0
+    }
+
+    fn sha(&mut self) -> usize {
+        self.fetch();
+        self.bus.write(
+            self.addr_abs,
+            self.a & self.x & (self.addr_abs.wrapping_shr(8) as u8).wrapping_add(1),
+        );
+
+        0
+    }
+
+    fn shx(&mut self) -> usize {
+        self.fetch();
+        self.bus.write(
+            self.addr_abs,
+            self.x & (self.addr_abs.wrapping_shr(8) as u8).wrapping_add(1),
+        );
+
+        0
+    }
+
+    fn shy(&mut self) -> usize {
+        self.fetch();
+        self.bus.write(
+            self.addr_abs,
+            self.y & (self.addr_abs.wrapping_shr(8) as u8).wrapping_add(1),
+        );
+
+        0
+    }
+
+    fn lxa(&mut self) -> usize {
+        self.fetch();
+
+        let res = (self.a | 0xEE) & self.fetched;
+        self.a = res;
+        self.x = res;
+
+        self.set_flag(Flags::Z, res == 0);
+        self.set_flag(Flags::N, (res & 0b10000000) > 0);
+
+        0
+    }
+
+    fn las(&mut self) -> usize {
+        self.fetch();
+
+        let res = self.fetched & self.sp;
+        self.a = res;
+        self.x = res;
+        self.sp = res;
+
+        self.set_flag(Flags::Z, res == 0);
+        self.set_flag(Flags::N, (res & 0b10000000) > 0);
+
+        0
+    }
 }
 
 #[cfg(test)]
@@ -2301,10 +3403,8 @@ mod tests {
     use serde::Deserialize;
     use test_generator::test_resources;
 
-    use std::fs;
     use std::fs::File;
     use std::io::BufReader;
-    use std::path::PathBuf;
 
     use crate::bus::Bus;
     use crate::cpu::Cpu;
