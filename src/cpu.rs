@@ -1,4 +1,6 @@
-use crate::bus::Bus;
+#![allow(dead_code)]
+
+use super::bus::Bus;
 
 enum Flag {
     C = (1 << 0), // carry bit
@@ -12,8 +14,8 @@ enum Flag {
 }
 
 struct Instruction {
-    operation: fn(&mut Cpu) -> usize,
-    addressmode: fn(&mut Cpu) -> usize,
+    operation: fn(&mut Cpu, &mut Bus) -> usize,
+    addressmode: fn(&mut Cpu, &mut Bus) -> usize,
     cycles: usize,
 }
 
@@ -284,7 +286,6 @@ pub struct Cpu {
     pub sp: u8,
     pub pc: u16,
     pub status: u8,
-    pub bus: Bus,
 
     pub fetched: u8,
     pub addr_abs: u16,
@@ -293,8 +294,8 @@ pub struct Cpu {
     pub cycles: usize,
 }
 
-impl Cpu {
-    pub fn new() -> Self {
+impl Default for Cpu {
+    fn default() -> Self {
         Self {
             a: 0x00,
             x: 0x00,
@@ -302,7 +303,6 @@ impl Cpu {
             sp: 0xFD,
             pc: 0x0000,
             status: 0x34,
-            bus: Bus::new(),
 
             fetched: 0x00,
             addr_abs: 0x0000,
@@ -311,7 +311,9 @@ impl Cpu {
             cycles: 0,
         }
     }
+}
 
+impl Cpu {
     fn set_flag(&mut self, flag: Flag, value: bool) {
         match value {
             true => self.status |= flag as u8,
@@ -323,17 +325,17 @@ impl Cpu {
         self.status & (flag as u8) != 0
     }
 
-    pub fn clock(&mut self) {
+    pub fn clock(&mut self, bus: &mut Bus) {
         if self.cycles == 0 {
-            self.opcode = self.bus.read(self.pc);
+            self.opcode = bus.read(self.pc);
             self.pc = self.pc.wrapping_add(1);
             self.set_flag(Flag::U, true);
 
             let instruction = &DISPATCH[self.opcode as usize];
 
             self.cycles = instruction.cycles;
-            let addr_cycles = (instruction.addressmode)(self);
-            let op_cycles = (instruction.operation)(self);
+            let addr_cycles = (instruction.addressmode)(self, bus);
+            let op_cycles = (instruction.operation)(self, bus);
 
             self.cycles += addr_cycles & op_cycles;
 
@@ -352,29 +354,27 @@ impl Cpu {
         self.set_flag(Flag::I, true);
     }
 
-    fn irq(&mut self) {
+    fn irq(&mut self, bus: &mut Bus) {
         if !self.get_flag(Flag::I) {
-            self.nmi();
+            self.nmi(bus);
         }
     }
 
-    fn nmi(&mut self) {
-        self.bus
-            .write(0x0100 + self.sp as u16, ((self.pc >> 8) & 0x00FF) as u8);
+    fn nmi(&mut self, bus: &mut Bus) {
+        bus.write(0x0100 + self.sp as u16, ((self.pc >> 8) & 0x00FF) as u8);
         self.sp = self.sp.wrapping_sub(1);
-        self.bus
-            .write(0x0100 + self.sp as u16, (self.pc & 0x00FF) as u8);
+        bus.write(0x0100 + self.sp as u16, (self.pc & 0x00FF) as u8);
         self.sp = self.sp.wrapping_sub(1);
 
         self.set_flag(Flag::B, false);
         self.set_flag(Flag::U, true);
         self.set_flag(Flag::I, true);
-        self.bus.write(0x0100 + self.sp as u16, self.status);
+        bus.write(0x0100 + self.sp as u16, self.status);
         self.sp = self.sp.wrapping_sub(1);
 
         self.addr_abs = 0xFFFE;
-        let lo: u16 = self.bus.read(self.addr_abs) as u16;
-        let hi: u16 = self.bus.read(self.addr_abs + 1) as u16;
+        let lo: u16 = bus.read(self.addr_abs) as u16;
+        let hi: u16 = bus.read(self.addr_abs + 1) as u16;
         self.pc = (hi << 8) | lo;
 
         self.cycles = 7;
@@ -383,14 +383,14 @@ impl Cpu {
     // ADDRESSING FUNCTIONS
 
     /// The addressing is implied in the opcode.
-    fn imp(&mut self) -> usize {
+    fn imp(&mut self, _: &mut Bus) -> usize {
         self.fetched = self.a;
 
         0
     }
 
     /// The address is supplied as part of the instruction.
-    fn imm(&mut self) -> usize {
+    fn imm(&mut self, _: &mut Bus) -> usize {
         self.addr_abs = self.pc;
         self.pc = self.pc.wrapping_add(1);
 
@@ -399,8 +399,8 @@ impl Cpu {
 
     /// Zero page addressing uses the high byte to address
     /// a specific page and the low byte to offset into that page
-    fn zp0(&mut self) -> usize {
-        self.addr_abs = self.bus.read(self.pc) as u16;
+    fn zp0(&mut self, bus: &mut Bus) -> usize {
+        self.addr_abs = bus.read(self.pc) as u16;
         self.pc = self.pc.wrapping_add(1);
 
         self.addr_abs &= 0x00FF;
@@ -409,8 +409,8 @@ impl Cpu {
     }
 
     /// Zero page addressing with register x as extra offset.
-    fn zpx(&mut self) -> usize {
-        self.addr_abs = self.bus.read(self.pc) as u16 + self.x as u16;
+    fn zpx(&mut self, bus: &mut Bus) -> usize {
+        self.addr_abs = bus.read(self.pc) as u16 + self.x as u16;
         self.pc = self.pc.wrapping_add(1);
         self.addr_abs &= 0x00FF;
 
@@ -418,8 +418,8 @@ impl Cpu {
     }
 
     /// Zero page addressing with register y as extra offset.
-    fn zpy(&mut self) -> usize {
-        self.addr_abs = self.bus.read(self.pc) as u16 + self.y as u16;
+    fn zpy(&mut self, bus: &mut Bus) -> usize {
+        self.addr_abs = bus.read(self.pc) as u16 + self.y as u16;
         self.pc = self.pc.wrapping_add(1);
         self.addr_abs &= 0x00FF;
 
@@ -429,8 +429,8 @@ impl Cpu {
     /// Relative addressing uses the second byte (signed) as an offset for the next
     /// instruction, which can range from -127 to +127 relative to the program
     /// counter.
-    fn rel(&mut self) -> usize {
-        self.addr_rel = self.bus.read(self.pc) as u16;
+    fn rel(&mut self, bus: &mut Bus) -> usize {
+        self.addr_rel = bus.read(self.pc) as u16;
         self.pc = self.pc.wrapping_add(1);
 
         if (self.addr_rel & 0b10000000) > 0 {
@@ -442,10 +442,10 @@ impl Cpu {
 
     /// Absolute addressing fetches the full 16 bit address
     /// from region in memory at the program counter.
-    fn abs(&mut self) -> usize {
-        let lo: u16 = self.bus.read(self.pc) as u16;
+    fn abs(&mut self, bus: &mut Bus) -> usize {
+        let lo: u16 = bus.read(self.pc) as u16;
         self.pc = self.pc.wrapping_add(1);
-        let hi: u16 = self.bus.read(self.pc) as u16;
+        let hi: u16 = bus.read(self.pc) as u16;
         self.pc = self.pc.wrapping_add(1);
 
         self.addr_abs = (hi << 8) | lo;
@@ -460,10 +460,10 @@ impl Cpu {
     /// The paging can overflow, in which case the 6502 requires an
     /// extra cycle to fetch the address. Therefore we return 1 if an
     /// overflow has occured.
-    fn abx(&mut self) -> usize {
-        let lo: u16 = self.bus.read(self.pc) as u16;
+    fn abx(&mut self, bus: &mut Bus) -> usize {
+        let lo: u16 = bus.read(self.pc) as u16;
         self.pc = self.pc.wrapping_add(1);
-        let hi: u16 = self.bus.read(self.pc) as u16;
+        let hi: u16 = bus.read(self.pc) as u16;
         self.pc = self.pc.wrapping_add(1);
 
         self.addr_abs = ((hi << 8) | lo).wrapping_add(self.x as u16);
@@ -476,10 +476,10 @@ impl Cpu {
     }
 
     /// Absolute addressing with y offset.
-    fn aby(&mut self) -> usize {
-        let lo: u16 = self.bus.read(self.pc) as u16;
+    fn aby(&mut self, bus: &mut Bus) -> usize {
+        let lo: u16 = bus.read(self.pc) as u16;
         self.pc = self.pc.wrapping_add(1);
-        let hi: u16 = self.bus.read(self.pc) as u16;
+        let hi: u16 = bus.read(self.pc) as u16;
         self.pc = self.pc.wrapping_add(1);
 
         self.addr_abs = ((hi << 8) | lo).wrapping_add(self.y as u16);
@@ -496,21 +496,21 @@ impl Cpu {
     /// target (actual address).
     ///
     /// Simulates boundary hardware bug of page overload.
-    fn ind(&mut self) -> usize {
-        let lo: u16 = self.bus.read(self.pc) as u16;
+    fn ind(&mut self, bus: &mut Bus) -> usize {
+        let lo: u16 = bus.read(self.pc) as u16;
         self.pc = self.pc.wrapping_add(1);
-        let hi: u16 = self.bus.read(self.pc) as u16;
+        let hi: u16 = bus.read(self.pc) as u16;
         self.pc = self.pc.wrapping_add(1);
         let target = hi.wrapping_shl(8) | lo;
 
         self.addr_abs = if lo == 0x00FF {
-            let effective_lo = self.bus.read(target) as u16;
-            let effective_hi = self.bus.read(target & 0xFF00) as u16;
+            let effective_lo = bus.read(target) as u16;
+            let effective_hi = bus.read(target & 0xFF00) as u16;
 
             effective_hi.wrapping_shl(8) | effective_lo
         } else {
-            let effective_lo = self.bus.read(target) as u16;
-            let effective_hi = self.bus.read(target + 1) as u16;
+            let effective_lo = bus.read(target) as u16;
+            let effective_hi = bus.read(target + 1) as u16;
 
             effective_hi.wrapping_shl(8) | effective_lo
         };
@@ -519,12 +519,12 @@ impl Cpu {
     }
 
     /// Zero page indirect addressing with register x offset.
-    fn izx(&mut self) -> usize {
-        let p: u16 = self.bus.read(self.pc) as u16;
+    fn izx(&mut self, bus: &mut Bus) -> usize {
+        let p: u16 = bus.read(self.pc) as u16;
         self.pc = self.pc.wrapping_add(1);
 
-        let lo: u16 = self.bus.read((p + self.x as u16) & 0x00FF) as u16;
-        let hi: u16 = self.bus.read((p + (self.x as u16) + 1) & 0x00FF) as u16;
+        let lo: u16 = bus.read((p + self.x as u16) & 0x00FF) as u16;
+        let hi: u16 = bus.read((p + (self.x as u16) + 1) & 0x00FF) as u16;
 
         self.addr_abs = (hi << 8) | lo;
 
@@ -534,12 +534,12 @@ impl Cpu {
     /// Zero page indirect addressing with register y offset. Different from izx,
     /// the register y offset is added onto the fetched 16 bits from memory location.
     /// It may overflow into the next page, requiring an extra cpu cycle to complete.
-    fn izy(&mut self) -> usize {
-        let t: u16 = self.bus.read(self.pc) as u16;
+    fn izy(&mut self, bus: &mut Bus) -> usize {
+        let t: u16 = bus.read(self.pc) as u16;
         self.pc = self.pc.wrapping_add(1);
 
-        let lo = self.bus.read(t & 0x00FF) as u16;
-        let hi = self.bus.read((t + 1) & 0x00FF) as u16;
+        let lo = bus.read(t & 0x00FF) as u16;
+        let hi = bus.read((t + 1) & 0x00FF) as u16;
 
         self.addr_abs = ((hi << 8) | lo).wrapping_add(self.y as u16);
 
@@ -552,10 +552,10 @@ impl Cpu {
 
     // OPCODE FUNCTIONS
 
-    fn fetch(&mut self) -> u8 {
+    fn fetch(&mut self, bus: &mut Bus) -> u8 {
         let instruction = &DISPATCH[self.opcode as usize];
         if instruction.addressmode as usize != Cpu::imp as usize {
-            self.fetched = self.bus.read(self.addr_abs);
+            self.fetched = bus.read(self.addr_abs);
         }
 
         self.fetched
@@ -575,30 +575,28 @@ impl Cpu {
         }
     }
 
-    fn brk(&mut self) -> usize {
-        self.bus
-            .write(0x0100 + self.sp as u16, ((self.pc >> 8) & 0x00FF) as u8);
+    fn brk(&mut self, bus: &mut Bus) -> usize {
+        bus.write(0x0100 + self.sp as u16, ((self.pc >> 8) & 0x00FF) as u8);
         self.sp = self.sp.wrapping_sub(1);
-        self.bus
-            .write(0x0100 + self.sp as u16, (self.pc & 0x00FF) as u8);
+        bus.write(0x0100 + self.sp as u16, (self.pc & 0x00FF) as u8);
         self.sp = self.sp.wrapping_sub(1);
 
         self.set_flag(Flag::B, true);
-        self.bus.write(0x0100 + self.sp as u16, self.status);
+        bus.write(0x0100 + self.sp as u16, self.status);
         self.sp = self.sp.wrapping_sub(1);
         self.set_flag(Flag::B, false);
 
-        // self.pc = self.bus.read(0xFFFE) as u16 | (self.bus.read(0xFFFF as u16) as u16) << 8;
-        let lo = self.bus.read(0xFFFEu16) as u16;
-        let hi = self.bus.read(0xFFFFu16) as u16;
+        // self.pc = bus.read(0xFFFE) as u16 | (bus.read(0xFFFF as u16) as u16) << 8;
+        let lo = bus.read(0xFFFEu16) as u16;
+        let hi = bus.read(0xFFFFu16) as u16;
         let addr = hi << 8 | lo;
         self.pc = addr;
         self.set_flag(Flag::I, true);
         0
     }
 
-    fn ora(&mut self) -> usize {
-        self.fetch();
+    fn ora(&mut self, bus: &mut Bus) -> usize {
+        self.fetch(bus);
 
         self.a |= self.fetched;
 
@@ -608,8 +606,8 @@ impl Cpu {
         0
     }
 
-    fn asl(&mut self) -> usize {
-        self.fetch();
+    fn asl(&mut self, bus: &mut Bus) -> usize {
+        self.fetch(bus);
         self.set_flag(Flag::C, (self.fetched & 0b10000000) > 0);
 
         let t: u8 = self.fetched.wrapping_shl(1);
@@ -621,14 +619,14 @@ impl Cpu {
         if (instruction.addressmode as usize) == (Cpu::imp as usize) {
             self.a = t;
         } else {
-            self.bus.write(self.addr_abs, t);
+            bus.write(self.addr_abs, t);
         }
 
         0
     }
 
-    fn php(&mut self) -> usize {
-        self.bus.write(
+    fn php(&mut self, bus: &mut Bus) -> usize {
+        bus.write(
             0x0100 + self.sp as u16,
             self.status | Flag::B as u8 | Flag::U as u8,
         );
@@ -640,28 +638,27 @@ impl Cpu {
         0
     }
 
-    fn bpl(&mut self) -> usize {
+    fn bpl(&mut self, _: &mut Bus) -> usize {
         self.conditional_branch(Flag::N, false);
 
         0
     }
 
-    fn clc(&mut self) -> usize {
+    fn clc(&mut self, _: &mut Bus) -> usize {
         self.set_flag(Flag::C, false);
 
         0
     }
 
-    fn jsr(&mut self) -> usize {
+    fn jsr(&mut self, bus: &mut Bus) -> usize {
         self.pc = self.pc.wrapping_sub(1);
 
-        self.bus.write(
+        bus.write(
             0x0100 + self.sp as u16,
             (self.pc.wrapping_shr(8) & 0x00FF) as u8,
         );
         self.sp = self.sp.wrapping_sub(1);
-        self.bus
-            .write(0x0100 + self.sp as u16, (self.pc & 0x00FF) as u8);
+        bus.write(0x0100 + self.sp as u16, (self.pc & 0x00FF) as u8);
         self.sp = self.sp.wrapping_sub(1);
 
         self.pc = self.addr_abs;
@@ -669,8 +666,8 @@ impl Cpu {
         0
     }
 
-    fn and(&mut self) -> usize {
-        self.fetch();
+    fn and(&mut self, bus: &mut Bus) -> usize {
+        self.fetch(bus);
         self.a &= self.fetched;
 
         self.set_flag(Flag::Z, self.a == 0x00);
@@ -679,8 +676,8 @@ impl Cpu {
         1
     }
 
-    fn bit(&mut self) -> usize {
-        self.fetch();
+    fn bit(&mut self, bus: &mut Bus) -> usize {
+        self.fetch(bus);
 
         self.set_flag(Flag::Z, (self.a & self.fetched) == 0);
         self.set_flag(Flag::N, self.fetched & (1 << 7) > 0);
@@ -689,8 +686,8 @@ impl Cpu {
         0
     }
 
-    fn rol(&mut self) -> usize {
-        self.fetch();
+    fn rol(&mut self, bus: &mut Bus) -> usize {
+        self.fetch(bus);
 
         let overflow = (self.fetched & 0b10000000) > 0;
         let operand = self.fetched.wrapping_shl(1) | self.get_flag(Flag::C) as u8;
@@ -703,15 +700,15 @@ impl Cpu {
         if (instruction.addressmode as usize) == (Cpu::imp as usize) {
             self.a = operand;
         } else {
-            self.bus.write(self.addr_abs, operand);
+            bus.write(self.addr_abs, operand);
         }
 
         0
     }
 
-    fn plp(&mut self) -> usize {
+    fn plp(&mut self, bus: &mut Bus) -> usize {
         self.sp = self.sp.wrapping_add(1);
-        self.status = self.bus.read(0x0100 + self.sp as u16);
+        self.status = bus.read(0x0100 + self.sp as u16);
 
         self.set_flag(Flag::U, true);
         self.set_flag(Flag::B, false);
@@ -719,34 +716,34 @@ impl Cpu {
         0
     }
 
-    fn bmi(&mut self) -> usize {
+    fn bmi(&mut self, _: &mut Bus) -> usize {
         self.conditional_branch(Flag::N, true);
 
         0
     }
 
-    fn sec(&mut self) -> usize {
+    fn sec(&mut self, _: &mut Bus) -> usize {
         self.set_flag(Flag::C, true);
 
         1
     }
 
-    fn rti(&mut self) -> usize {
+    fn rti(&mut self, bus: &mut Bus) -> usize {
         self.sp = self.sp.wrapping_add(1);
-        self.status = self.bus.read(0x0100 + self.sp as u16);
+        self.status = bus.read(0x0100 + self.sp as u16);
         self.status &= !(Flag::B as u8);
         self.status &= !(Flag::U as u8);
 
         self.sp = self.sp.wrapping_add(1);
-        self.pc = self.bus.read(0x0100 + self.sp as u16) as u16;
+        self.pc = bus.read(0x0100 + self.sp as u16) as u16;
         self.sp = self.sp.wrapping_add(1);
-        self.pc |= (self.bus.read(0x0100 + self.sp as u16) as u16).wrapping_shl(8);
+        self.pc |= (bus.read(0x0100 + self.sp as u16) as u16).wrapping_shl(8);
 
         0
     }
 
-    fn eor(&mut self) -> usize {
-        self.fetch();
+    fn eor(&mut self, bus: &mut Bus) -> usize {
+        self.fetch(bus);
 
         self.a ^= self.fetched;
 
@@ -756,8 +753,8 @@ impl Cpu {
         0
     }
 
-    fn lsr(&mut self) -> usize {
-        self.fetch();
+    fn lsr(&mut self, bus: &mut Bus) -> usize {
+        self.fetch(bus);
         self.set_flag(Flag::C, (self.fetched & 0x0001) > 0);
 
         let t: u8 = self.fetched.wrapping_shr(1);
@@ -769,50 +766,50 @@ impl Cpu {
         if (instruction.addressmode as usize) == (Cpu::imp as usize) {
             self.a = t;
         } else {
-            self.bus.write(self.addr_abs, t);
+            bus.write(self.addr_abs, t);
         }
 
         0
     }
 
-    fn pha(&mut self) -> usize {
-        self.bus.write(0x0100 + self.sp as u16, self.a);
+    fn pha(&mut self, bus: &mut Bus) -> usize {
+        bus.write(0x0100 + self.sp as u16, self.a);
         self.sp = self.sp.wrapping_sub(1);
 
         0
     }
 
-    fn jmp(&mut self) -> usize {
+    fn jmp(&mut self, _: &mut Bus) -> usize {
         self.pc = self.addr_abs;
 
         0
     }
 
-    fn bvc(&mut self) -> usize {
+    fn bvc(&mut self, _: &mut Bus) -> usize {
         self.conditional_branch(Flag::V, false);
 
         0
     }
 
-    fn cli(&mut self) -> usize {
+    fn cli(&mut self, _: &mut Bus) -> usize {
         self.set_flag(Flag::I, false);
 
         0
     }
 
-    fn rts(&mut self) -> usize {
+    fn rts(&mut self, bus: &mut Bus) -> usize {
         self.sp = self.sp.wrapping_add(1);
-        let lo: u16 = self.bus.read(0x0100 + self.sp as u16) as u16;
+        let lo: u16 = bus.read(0x0100 + self.sp as u16) as u16;
         self.sp = self.sp.wrapping_add(1);
-        let hi: u16 = self.bus.read(0x0100 + self.sp as u16) as u16;
+        let hi: u16 = bus.read(0x0100 + self.sp as u16) as u16;
 
         self.pc = (hi.wrapping_shl(8) | lo).wrapping_add(1);
 
         0
     }
 
-    fn adc(&mut self) -> usize {
-        self.fetch();
+    fn adc(&mut self, bus: &mut Bus) -> usize {
+        self.fetch(bus);
 
         let result: u16 = self.a as u16 + self.fetched as u16 + self.get_flag(Flag::C) as u16;
         let overflow =
@@ -829,8 +826,8 @@ impl Cpu {
         1
     }
 
-    fn ror(&mut self) -> usize {
-        self.fetch();
+    fn ror(&mut self, bus: &mut Bus) -> usize {
+        self.fetch(bus);
         let t = ((self.get_flag(Flag::C) as u8) << 7) as u16 | self.fetched.wrapping_shr(1) as u16;
 
         self.set_flag(Flag::C, (self.fetched & 0x01) > 0);
@@ -841,15 +838,15 @@ impl Cpu {
         if (instruction.addressmode as usize) == (Cpu::imp as usize) {
             self.a = (t & 0x00FF) as u8;
         } else {
-            self.bus.write(self.addr_abs, (t & 0x00FF) as u8);
+            bus.write(self.addr_abs, (t & 0x00FF) as u8);
         }
 
         0
     }
 
-    fn pla(&mut self) -> usize {
+    fn pla(&mut self, bus: &mut Bus) -> usize {
         self.sp = self.sp.wrapping_add(1);
-        self.a = self.bus.read(0x0100 + self.sp as u16);
+        self.a = bus.read(0x0100 + self.sp as u16);
 
         self.set_flag(Flag::Z, self.a == 0);
         self.set_flag(Flag::N, (self.a & 0b10000000) > 0);
@@ -857,37 +854,37 @@ impl Cpu {
         0
     }
 
-    fn bvs(&mut self) -> usize {
+    fn bvs(&mut self, _: &mut Bus) -> usize {
         self.conditional_branch(Flag::V, true);
 
         0
     }
 
-    fn sei(&mut self) -> usize {
+    fn sei(&mut self, _: &mut Bus) -> usize {
         self.set_flag(Flag::I, true);
 
         0
     }
 
-    fn sta(&mut self) -> usize {
-        self.bus.write(self.addr_abs, self.a);
+    fn sta(&mut self, bus: &mut Bus) -> usize {
+        bus.write(self.addr_abs, self.a);
 
         0
     }
 
-    fn sty(&mut self) -> usize {
-        self.bus.write(self.addr_abs, self.y);
+    fn sty(&mut self, bus: &mut Bus) -> usize {
+        bus.write(self.addr_abs, self.y);
 
         0
     }
 
-    fn stx(&mut self) -> usize {
-        self.bus.write(self.addr_abs, self.x);
+    fn stx(&mut self, bus: &mut Bus) -> usize {
+        bus.write(self.addr_abs, self.x);
 
         0
     }
 
-    fn dey(&mut self) -> usize {
+    fn dey(&mut self, _: &mut Bus) -> usize {
         self.y = self.y.wrapping_sub(1);
 
         self.set_flag(Flag::Z, self.y == 0);
@@ -896,7 +893,7 @@ impl Cpu {
         0
     }
 
-    fn txa(&mut self) -> usize {
+    fn txa(&mut self, _: &mut Bus) -> usize {
         self.a = self.x;
 
         self.set_flag(Flag::Z, self.a == 0);
@@ -905,13 +902,13 @@ impl Cpu {
         0
     }
 
-    fn bcc(&mut self) -> usize {
+    fn bcc(&mut self, _: &mut Bus) -> usize {
         self.conditional_branch(Flag::C, false);
 
         0
     }
 
-    fn tya(&mut self) -> usize {
+    fn tya(&mut self, _: &mut Bus) -> usize {
         self.a = self.y;
 
         self.set_flag(Flag::Z, self.a == 0);
@@ -920,14 +917,14 @@ impl Cpu {
         0
     }
 
-    fn txs(&mut self) -> usize {
+    fn txs(&mut self, _: &mut Bus) -> usize {
         self.sp = self.x;
 
         0
     }
 
-    fn ldy(&mut self) -> usize {
-        self.fetch();
+    fn ldy(&mut self, bus: &mut Bus) -> usize {
+        self.fetch(bus);
         self.y = self.fetched;
 
         self.set_flag(Flag::Z, self.y == 0);
@@ -936,8 +933,8 @@ impl Cpu {
         1
     }
 
-    fn lda(&mut self) -> usize {
-        self.fetch();
+    fn lda(&mut self, bus: &mut Bus) -> usize {
+        self.fetch(bus);
         self.a = self.fetched;
 
         self.set_flag(Flag::Z, self.a == 0);
@@ -946,8 +943,8 @@ impl Cpu {
         1
     }
 
-    fn ldx(&mut self) -> usize {
-        self.fetch();
+    fn ldx(&mut self, bus: &mut Bus) -> usize {
+        self.fetch(bus);
         self.x = self.fetched;
 
         self.set_flag(Flag::Z, self.x == 0);
@@ -956,7 +953,7 @@ impl Cpu {
         1
     }
 
-    fn tay(&mut self) -> usize {
+    fn tay(&mut self, _: &mut Bus) -> usize {
         self.y = self.a;
 
         self.set_flag(Flag::Z, self.y == 0);
@@ -965,7 +962,7 @@ impl Cpu {
         0
     }
 
-    fn tax(&mut self) -> usize {
+    fn tax(&mut self, _: &mut Bus) -> usize {
         self.x = self.a;
 
         self.set_flag(Flag::Z, self.x == 0);
@@ -974,19 +971,19 @@ impl Cpu {
         0
     }
 
-    fn bcs(&mut self) -> usize {
+    fn bcs(&mut self, _: &mut Bus) -> usize {
         self.conditional_branch(Flag::C, true);
 
         0
     }
 
-    fn clv(&mut self) -> usize {
+    fn clv(&mut self, _: &mut Bus) -> usize {
         self.set_flag(Flag::V, false);
 
         0
     }
 
-    fn tsx(&mut self) -> usize {
+    fn tsx(&mut self, _: &mut Bus) -> usize {
         self.x = self.sp;
 
         self.set_flag(Flag::Z, self.x == 0);
@@ -995,8 +992,8 @@ impl Cpu {
         0
     }
 
-    fn cpy(&mut self) -> usize {
-        self.fetch();
+    fn cpy(&mut self, bus: &mut Bus) -> usize {
+        self.fetch(bus);
 
         self.set_flag(Flag::C, self.y >= self.fetched);
         self.set_flag(Flag::Z, self.y == self.fetched);
@@ -1008,8 +1005,8 @@ impl Cpu {
         0
     }
 
-    fn cmp(&mut self) -> usize {
-        self.fetch();
+    fn cmp(&mut self, bus: &mut Bus) -> usize {
+        self.fetch(bus);
 
         self.set_flag(Flag::C, self.a >= self.fetched);
         self.set_flag(Flag::Z, self.a == self.fetched);
@@ -1021,11 +1018,11 @@ impl Cpu {
         0
     }
 
-    fn dec(&mut self) -> usize {
-        self.fetch();
+    fn dec(&mut self, bus: &mut Bus) -> usize {
+        self.fetch(bus);
 
         let value = self.fetched.wrapping_sub(1);
-        self.bus.write(self.addr_abs, value);
+        bus.write(self.addr_abs, value);
 
         self.set_flag(Flag::Z, value == 0);
         self.set_flag(Flag::N, (value & 0b10000000) > 0);
@@ -1033,7 +1030,7 @@ impl Cpu {
         0
     }
 
-    fn iny(&mut self) -> usize {
+    fn iny(&mut self, _: &mut Bus) -> usize {
         self.y = self.y.wrapping_add(1);
 
         self.set_flag(Flag::Z, self.y == 0);
@@ -1042,7 +1039,7 @@ impl Cpu {
         0
     }
 
-    fn dex(&mut self) -> usize {
+    fn dex(&mut self, _: &mut Bus) -> usize {
         self.x = self.x.wrapping_sub(1);
 
         self.set_flag(Flag::Z, self.x == 0);
@@ -1051,24 +1048,24 @@ impl Cpu {
         0
     }
 
-    fn bne(&mut self) -> usize {
+    fn bne(&mut self, _: &mut Bus) -> usize {
         self.conditional_branch(Flag::Z, false);
 
         0
     }
 
-    fn cld(&mut self) -> usize {
+    fn cld(&mut self, _: &mut Bus) -> usize {
         self.set_flag(Flag::D, false);
 
         0
     }
 
-    fn nop(&mut self) -> usize {
+    fn nop(&mut self, _: &mut Bus) -> usize {
         0
     }
 
-    fn cpx(&mut self) -> usize {
-        self.fetch();
+    fn cpx(&mut self, bus: &mut Bus) -> usize {
+        self.fetch(bus);
 
         self.set_flag(Flag::C, self.x >= self.fetched);
         self.set_flag(Flag::Z, self.x == self.fetched);
@@ -1080,8 +1077,8 @@ impl Cpu {
         0
     }
 
-    fn sbc(&mut self) -> usize {
-        self.fetch();
+    fn sbc(&mut self, bus: &mut Bus) -> usize {
+        self.fetch(bus);
         self.fetched = !self.fetched;
 
         let result: u16 = self.a as u16 + self.fetched as u16 + self.get_flag(Flag::C) as u16;
@@ -1099,11 +1096,11 @@ impl Cpu {
         1
     }
 
-    fn inc(&mut self) -> usize {
-        self.fetch();
+    fn inc(&mut self, bus: &mut Bus) -> usize {
+        self.fetch(bus);
 
         let value: u8 = self.fetched.wrapping_add(1);
-        self.bus.write(self.addr_abs, value);
+        bus.write(self.addr_abs, value);
 
         self.set_flag(Flag::N, (value & 0b10000000) > 0);
         self.set_flag(Flag::Z, value == 0);
@@ -1111,7 +1108,7 @@ impl Cpu {
         0
     }
 
-    fn inx(&mut self) -> usize {
+    fn inx(&mut self, _: &mut Bus) -> usize {
         self.x = self.x.wrapping_add(1);
 
         self.set_flag(Flag::N, (self.x & 0b10000000) > 0);
@@ -1120,13 +1117,13 @@ impl Cpu {
         1
     }
 
-    fn beq(&mut self) -> usize {
+    fn beq(&mut self, _: &mut Bus) -> usize {
         self.conditional_branch(Flag::Z, true);
 
         0
     }
 
-    fn sed(&mut self) -> usize {
+    fn sed(&mut self, _: &mut Bus) -> usize {
         self.set_flag(Flag::D, true);
 
         0
@@ -1134,78 +1131,78 @@ impl Cpu {
 
     // Illegal opcodes
 
-    fn lax(&mut self) -> usize {
-        self.lda();
-        self.tax();
+    fn lax(&mut self, bus: &mut Bus) -> usize {
+        self.lda(bus);
+        self.tax(bus);
 
         1
     }
 
-    fn sax(&mut self) -> usize {
-        self.bus.write(self.addr_abs, self.a & self.x);
+    fn sax(&mut self, bus: &mut Bus) -> usize {
+        bus.write(self.addr_abs, self.a & self.x);
 
         0
     }
 
-    fn dcp(&mut self) -> usize {
-        self.dec();
-        self.cmp();
+    fn dcp(&mut self, bus: &mut Bus) -> usize {
+        self.dec(bus);
+        self.cmp(bus);
 
         0
     }
 
-    fn isc(&mut self) -> usize {
-        self.inc();
-        self.sbc();
+    fn isc(&mut self, bus: &mut Bus) -> usize {
+        self.inc(bus);
+        self.sbc(bus);
 
         1
     }
 
-    fn slo(&mut self) -> usize {
-        self.asl();
-        self.ora();
+    fn slo(&mut self, bus: &mut Bus) -> usize {
+        self.asl(bus);
+        self.ora(bus);
 
         0
     }
 
-    fn rla(&mut self) -> usize {
-        self.rol();
-        self.and();
+    fn rla(&mut self, bus: &mut Bus) -> usize {
+        self.rol(bus);
+        self.and(bus);
 
         1
     }
 
-    fn sre(&mut self) -> usize {
-        self.lsr();
-        self.eor();
+    fn sre(&mut self, bus: &mut Bus) -> usize {
+        self.lsr(bus);
+        self.eor(bus);
 
         0
     }
 
-    fn rra(&mut self) -> usize {
-        self.ror();
-        self.adc();
+    fn rra(&mut self, bus: &mut Bus) -> usize {
+        self.ror(bus);
+        self.adc(bus);
 
         1
     }
 
     // Halts the cpu which doesn't increase the program counter.
     // Remove 1 from the pc to mimic this behavior.
-    fn kil(&mut self) -> usize {
+    fn kil(&mut self, _: &mut Bus) -> usize {
         self.pc = self.pc.wrapping_sub(1);
 
         0
     }
 
-    fn anc(&mut self) -> usize {
-        self.and();
+    fn anc(&mut self, bus: &mut Bus) -> usize {
+        self.and(bus);
         self.set_flag(Flag::C, (self.a & 0b10000000) > 0);
 
         1
     }
 
-    fn alr(&mut self) -> usize {
-        self.and();
+    fn alr(&mut self, bus: &mut Bus) -> usize {
+        self.and(bus);
 
         self.set_flag(Flag::C, (self.a & 0x0001) > 0);
         self.a = self.a.wrapping_shr(1);
@@ -1216,8 +1213,8 @@ impl Cpu {
         1
     }
 
-    fn arr(&mut self) -> usize {
-        self.fetch();
+    fn arr(&mut self, bus: &mut Bus) -> usize {
+        self.fetch(bus);
         self.a &= self.fetched;
 
         let t = self.a.wrapping_shr(7);
@@ -1238,8 +1235,8 @@ impl Cpu {
     // Unstable operation; 0xEE could be 0xFF, 0x00, etc.
     // depending on the specific chip or even environmental
     // conditions.
-    fn xaa(&mut self) -> usize {
-        self.fetch();
+    fn xaa(&mut self, bus: &mut Bus) -> usize {
+        self.fetch(bus);
         self.a = (self.a | 0xEE) & self.x & self.fetched;
 
         self.set_flag(Flag::N, (self.a & 0b10000000) > 0);
@@ -1248,8 +1245,8 @@ impl Cpu {
         0
     }
 
-    fn axs(&mut self) -> usize {
-        self.fetch();
+    fn axs(&mut self, bus: &mut Bus) -> usize {
+        self.fetch(bus);
 
         let res = (self.a & self.x).wrapping_sub(self.fetched);
 
@@ -1262,10 +1259,10 @@ impl Cpu {
         0
     }
 
-    fn tas(&mut self) -> usize {
-        self.fetch();
+    fn tas(&mut self, bus: &mut Bus) -> usize {
+        self.fetch(bus);
         self.sp = self.a & self.x;
-        self.bus.write(
+        bus.write(
             self.addr_abs,
             self.a & self.x & ((self.addr_abs.wrapping_shr(8) as u8).wrapping_add(1)),
         );
@@ -1273,9 +1270,9 @@ impl Cpu {
         0
     }
 
-    fn sha(&mut self) -> usize {
-        self.fetch();
-        self.bus.write(
+    fn sha(&mut self, bus: &mut Bus) -> usize {
+        self.fetch(bus);
+        bus.write(
             self.addr_abs,
             self.a & self.x & (self.addr_abs.wrapping_shr(8) as u8).wrapping_add(1),
         );
@@ -1283,9 +1280,9 @@ impl Cpu {
         0
     }
 
-    fn shx(&mut self) -> usize {
-        self.fetch();
-        self.bus.write(
+    fn shx(&mut self, bus: &mut Bus) -> usize {
+        self.fetch(bus);
+        bus.write(
             self.addr_abs,
             self.x & (self.addr_abs.wrapping_shr(8) as u8).wrapping_add(1),
         );
@@ -1293,9 +1290,9 @@ impl Cpu {
         0
     }
 
-    fn shy(&mut self) -> usize {
-        self.fetch();
-        self.bus.write(
+    fn shy(&mut self, bus: &mut Bus) -> usize {
+        self.fetch(bus);
+        bus.write(
             self.addr_abs,
             self.y & (self.addr_abs.wrapping_shr(8) as u8).wrapping_add(1),
         );
@@ -1303,8 +1300,8 @@ impl Cpu {
         0
     }
 
-    fn lxa(&mut self) -> usize {
-        self.fetch();
+    fn lxa(&mut self, bus: &mut Bus) -> usize {
+        self.fetch(bus);
 
         let res = (self.a | 0xEE) & self.fetched;
         self.a = res;
@@ -1316,8 +1313,8 @@ impl Cpu {
         0
     }
 
-    fn las(&mut self) -> usize {
-        self.fetch();
+    fn las(&mut self, bus: &mut Bus) -> usize {
+        self.fetch(bus);
 
         let res = self.fetched & self.sp;
         self.a = res;
@@ -1341,6 +1338,7 @@ mod tests {
     use std::fs::File;
     use std::io::BufReader;
 
+    use crate::bus::Bus;
     use crate::cpu::Cpu;
 
     #[derive(Debug, Deserialize)]
@@ -1356,12 +1354,10 @@ mod tests {
 
     #[derive(Debug, Deserialize)]
     struct TestCase {
-        name: String,
         #[serde(rename = "initial")]
         initial_state: CpuState,
         #[serde(rename = "final")]
         final_state: CpuState,
-        cycles: Vec<(u16, u8, String)>,
     }
 
     #[test_resources("tests/*.json")]
@@ -1373,7 +1369,8 @@ mod tests {
 
         for test_case in test_cases.iter() {
             // Filling CPU state
-            let mut cpu = Cpu::new();
+            let mut bus = Bus::default();
+            let mut cpu = Cpu::default();
 
             // let mut cpu = Cpu::new();
             cpu.reset();
@@ -1388,11 +1385,11 @@ mod tests {
             cpu.cycles = 0;
 
             for (address, value) in test_case.initial_state.ram.iter() {
-                cpu.bus.write(*address, *value);
+                bus.write(*address, *value);
             }
 
             loop {
-                cpu.clock();
+                cpu.clock(&mut bus);
 
                 if cpu.complete() {
                     break;
@@ -1408,7 +1405,7 @@ mod tests {
             assert_eq!(cpu.status, test_case.final_state.p);
 
             for (address, value) in test_case.final_state.ram.iter() {
-                assert_eq!(cpu.bus.read(*address), *value)
+                assert_eq!(bus.read(*address), *value)
             }
         }
     }

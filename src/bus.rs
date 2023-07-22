@@ -2,13 +2,15 @@ pub struct Bus {
     ram: [u8; 64 * 1024],
 }
 
-impl Bus {
-    pub fn new() -> Bus {
-        Bus {
+impl Default for Bus {
+    fn default() -> Self {
+        Self {
             ram: [0; 64 * 1024],
         }
     }
+}
 
+impl Bus {
     pub fn write<T: Into<u16>>(&mut self, addr: T, data: u8) {
         let address = addr.into();
         match address {
