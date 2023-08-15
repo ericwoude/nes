@@ -1,5 +1,8 @@
 # NES
 
+
+![build](https://github.com/ericwoude/nes/actions/workflows/ci.yaml/badge.svg)
+
 This repository is a Work In Project. Currently the processor is fully tested, passing all unit tests and the nestest rom. The following steps are lined out in the roadmap below.
 
 ## Roadmap
@@ -13,7 +16,7 @@ This repository is a Work In Project. Currently the processor is fully tested, p
 
 ## Testing
 The unit tests are not included in the repository as they sum up to over a GB of data. Invoke `fetch.sh` to download the unit tests.
-```bash
+```
 λ cd tests
 λ sh fetch.sh
 λ cargo test

@@ -552,7 +552,7 @@ impl Cpu {
 
     // OPCODE FUNCTIONS
 
-    fn fetch(&mut self, bus: &mut Bus) -> u8 {
+    fn fetch(&mut self, bus: &Bus) -> u8 {
         let instruction = &DISPATCH[self.opcode as usize];
         if instruction.addressmode as usize != Cpu::imp as usize {
             self.fetched = bus.read(self.addr_abs);
