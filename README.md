@@ -1,6 +1,20 @@
 # NES
 
-## Tests
-All operations are individually tested using a test suite by Tom Harte [(link)](https://github.com/TomHarte/ProcessorTests/tree/main/6502/v1). To download all test files, move to the test directory and run the shell script.
-`$ cd tests; sh fetch.sh`
-`$ cargo test`
+This repository is a Work In Project. Currently the processor is fully tested, passing all unit tests and the nestest rom. The following steps are lined out in the roadmap below.
+
+## Roadmap
+- [x] CPU
+  - [x] Fully unit-tested per instruction [(Tom Harte's processor tests)](https://github.com/TomHarte/ProcessorTests/tree/main/6502/v1)
+  - [x] Functional tests passing [(nestest)](http://nickmass.com/images/nestest.nes)
+- [ ] Mapper 0
+- [ ] GPU
+- [ ] APU
+- [ ] Extended mappers
+
+## Testing
+The unit tests are not included in the repository as they sum up to over a GB of data. Invoke `fetch.sh` to download the unit tests.
+```bash
+λ cd tests
+λ sh fetch.sh
+λ cargo test
+```
